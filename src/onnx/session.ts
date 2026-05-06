@@ -1,4 +1,4 @@
-import * as ort from "onnxruntime-web";
+import * as ort from "onnxruntime-web/webgpu";
 import { isWebGpuAvailable } from "./backend";
 import type { InitSessionOptions, SessionResult } from "./types";
 

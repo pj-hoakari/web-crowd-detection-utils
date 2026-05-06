@@ -1,4 +1,4 @@
-import * as ort from "onnxruntime-web";
+import * as ort from "onnxruntime-web/webgpu";
 import type { PreprocessOptions } from "./types";
 
 const DEFAULT_INPUT_SIZE = 640;

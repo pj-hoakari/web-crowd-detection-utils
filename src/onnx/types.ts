@@ -1,4 +1,4 @@
-import type * as ort from "onnxruntime-web";
+import type * as ort from "onnxruntime-web/webgpu";
 
 export type ExecutionProvider = "webgpu" | "wasm";
 

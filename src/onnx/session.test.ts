@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("onnxruntime-web", () => ({
+vi.mock("onnxruntime-web/webgpu", () => ({
 	InferenceSession: {
 		create: vi.fn(async () => ({
 			inputNames: ["input"],
@@ -9,7 +9,7 @@ vi.mock("onnxruntime-web", () => ({
 	},
 }));
 
-import * as ort from "onnxruntime-web";
+import * as ort from "onnxruntime-web/webgpu";
 import { initSession } from "./session";
 
 describe("initSession", () => {
