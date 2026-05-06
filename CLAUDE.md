@@ -49,7 +49,9 @@ When porting a module from sandbox `src/lib/<name>/` (e.g. `yolo`):
      "import": "./dist/<name>/index.js"
    }
    ```
-4. If the module has a runtime dep the host app should own (e.g. `onnxruntime-web` for `onnx`/`yolo`), add it as a `peerDependency` (with `peerDependenciesMeta.optional: true` when only some subpaths require it), not a `dependency`.
+4. Decide how to declare any runtime dep:
+   - Default to `dependencies` so consumer projects don't need to declare it themselves and version drift is impossible. `onnxruntime-web` is managed this way.
+   - Use `peerDependency` (with `peerDependenciesMeta.optional: true` when only some subpaths require it) only when the host app legitimately needs to control the version (e.g. a framework like React).
 5. Add Vitest specs as `src/<name>/**/*.{test,spec}.ts`.
 
 Do not pre-create empty entries or stub exports for modules that have not been ported yet — the user's policy is "add per-module configuration when implementation begins, not before."
@@ -61,7 +63,7 @@ Do not pre-create empty entries or stub exports for modules that have not been p
 - **Output:** ESM only, no CJS. The package is browser-first; pure-logic modules (`bytetrack`, `lines`) are isomorphic, but the package as a whole is not designed for Node consumers.
 - **Side effects:** `package.json` declares `sideEffects: false` — keep it true. No top-level statements with side effects in modules.
 - **Tree-shake & code-split:** tsdown's defaults (`treeshake: true`, splitting always on) are relied upon. Don't add re-export-everything barrels at the package root that would defeat per-subpath tree shaking — use the subpath exports.
-- **`peerDependencies` over `dependencies`** for anything heavy the host app likely already has (e.g. `onnxruntime-web`).
+- **Runtime deps via `dependencies` by default** so consumers don't need to redeclare them. `onnxruntime-web` is owned by this package; consumer apps must not add it themselves (version drift risk). Reserve `peerDependencies` for cases where the host app must control the version (e.g. a framework like React).
 
 ## Tooling notes
 

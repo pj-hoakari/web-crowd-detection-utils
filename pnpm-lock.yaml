@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      onnxruntime-web:
+        specifier: ^1.24.3
+        version: 1.24.3
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.4.13
@@ -17,9 +21,6 @@ importers:
       happy-dom:
         specifier: ^20.9.0
         version: 20.9.0
-      onnxruntime-web:
-        specifier: ^1.24.3
-        version: 1.24.3
       tsdown:
         specifier: ^0.21.10
         version: 0.21.10(typescript@6.0.3)
