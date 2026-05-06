@@ -1,0 +1,87 @@
+.app {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+	padding: 32px 24px;
+	text-align: left;
+	flex-grow: 1;
+	box-sizing: border-box;
+}
+
+.app header h1 {
+	margin: 0 0 8px;
+	font-size: 32px;
+	letter-spacing: -0.5px;
+}
+
+.app .subtitle {
+	margin: 0;
+	color: var(--text);
+}
+
+.controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+}
+
+.controls button {
+	padding: 8px 16px;
+	border-radius: 6px;
+	border: 1px solid var(--border);
+	background: var(--accent-bg);
+	color: var(--accent);
+	font: inherit;
+	cursor: pointer;
+}
+
+.controls button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.model-path {
+	font-size: 13px;
+	padding: 4px 8px;
+	background: var(--code-bg);
+	border-radius: 4px;
+	color: var(--text);
+}
+
+.status {
+	margin: 0;
+	padding: 8px 12px;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	background: var(--code-bg);
+	font-family: var(--mono);
+	font-size: 14px;
+}
+
+.status[data-phase="error"] {
+	border-color: #d93b3b;
+	color: #d93b3b;
+}
+
+.stage {
+	position: relative;
+	width: 100%;
+	max-width: 960px;
+	background: #000;
+	border-radius: 8px;
+	overflow: hidden;
+}
+
+.stage video,
+.stage canvas {
+	display: block;
+	width: 100%;
+	height: auto;
+}
+
+.stage canvas {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}

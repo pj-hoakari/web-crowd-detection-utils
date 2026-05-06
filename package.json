@@ -41,6 +41,7 @@
 	"types": "./dist/index.d.ts",
 	"scripts": {
 		"build": "tsdown",
+		"dev": "tsdown --watch",
 		"typecheck": "tsc --noEmit",
 		"check": "biome check .",
 		"fix": "biome check --fix .",
