@@ -1,3 +1,4 @@
+import type * as ort from "onnxruntime-web/webgpu";
 import { createPreprocessBuffer, initSession, rgbaToFloat32Chw } from "@/onnx";
 import { postprocess } from "./postprocess";
 import type { Detection, YoloDetector, YoloDetectorOptions } from "./types";
@@ -15,6 +16,9 @@ export async function createYoloDetector(
 		...options.session,
 	});
 
+	const ortRuntime = await import("onnxruntime-web/webgpu");
+	const TensorCtor: typeof ort.Tensor = ortRuntime.Tensor;
+
 	const buffer = options.preprocessBuffer ?? createPreprocessBuffer(inputSize);
 	const inputName = session.inputNames[0];
 	const outputName = session.outputNames[0];
@@ -29,7 +33,13 @@ export async function createYoloDetector(
 		backend,
 		inputSize,
 		async detect(imageData: ImageData): Promise<Detection[]> {
-			const tensor = rgbaToFloat32Chw(imageData, { inputSize, buffer });
+			const float32 = rgbaToFloat32Chw(imageData, { inputSize, buffer });
+			const tensor = new TensorCtor("float32", float32, [
+				1,
+				3,
+				inputSize,
+				inputSize,
+			]);
 			const results = await session.run({ [inputName]: tensor });
 			const output = results[outputName];
 			if (!output) {
