@@ -1,4 +1,4 @@
-import * as ort from "onnxruntime-web/webgpu";
+import type * as ort from "onnxruntime-web/webgpu";
 import { isWebGpuAvailable } from "./backend";
 import type { InitSessionOptions, SessionResult } from "./types";
 
@@ -18,7 +18,8 @@ export async function initSession(
 		);
 	}
 
-	const session = await ort.InferenceSession.create(
+	const ortRuntime = await import("onnxruntime-web/webgpu");
+	const session = await ortRuntime.InferenceSession.create(
 		modelPath as Parameters<typeof ort.InferenceSession.create>[0],
 		{
 			...sessionOptions,

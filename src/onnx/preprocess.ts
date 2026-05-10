@@ -1,4 +1,3 @@
-import * as ort from "onnxruntime-web/webgpu";
 import type { PreprocessOptions } from "./types";
 
 const DEFAULT_INPUT_SIZE = 640;
@@ -23,7 +22,7 @@ function getOrCreateCachedBuffer(inputSize: number): Float32Array {
 export function rgbaToFloat32Chw(
 	imageData: ImageData,
 	options: PreprocessOptions = {},
-): ort.Tensor {
+): Float32Array {
 	const inputSize = options.inputSize ?? DEFAULT_INPUT_SIZE;
 	const channelSize = inputSize * inputSize;
 	const required = 3 * channelSize;
@@ -43,5 +42,5 @@ export function rgbaToFloat32Chw(
 		buffer[2 * channelSize + i] = (data[rgbaIdx + 2] as number) / 255;
 	}
 
-	return new ort.Tensor("float32", buffer, [1, 3, inputSize, inputSize]);
+	return buffer;
 }
