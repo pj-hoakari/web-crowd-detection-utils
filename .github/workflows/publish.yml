@@ -1,69 +1,67 @@
 name: Publish to GitHub Packages
 
 on:
-  release:
-    types: [published]
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to publish (e.g. 1.2.3). Leave blank to use package.json version."
-        required: false
-        type: string
+    release:
+        types: [published]
+    workflow_dispatch:
+        inputs:
+            version:
+                description: "Version to publish (e.g. 1.2.3). Leave blank to use package.json version."
+                required: false
+                type: string
 
 jobs:
-  publish:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
+    publish:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write
+            id-token: write
+        steps:
+            - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
+            - uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-          registry-url: https://npm.pkg.github.com
-          scope: "@kasumimercury"
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+                  registry-url: https://npm.pkg.github.com
+                  scope: "@kasumimercury"
 
-      - name: Resolve version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            tag="${{ github.event.release.tag_name }}"
-            version="${tag#v}"
-          elif [ -n "${{ inputs.version }}" ]; then
-            version="${{ inputs.version }}"
-          else
-            version=""
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+            - name: Resolve version
+              id: version
+              run: |
+                  if [ "${{ github.event_name }}" = "release" ]; then
+                    tag="${{ github.event.release.tag_name }}"
+                    version="${tag#v}"
+                  elif [ -n "${{ inputs.version }}" ]; then
+                    version="${{ inputs.version }}"
+                  else
+                    version=""
+                  fi
+                  echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Sync package.json version
-        if: steps.version.outputs.version != ''
-        run: pnpm version "${{ steps.version.outputs.version }}" --no-git-tag-version --allow-same-version
+            - name: Sync package.json version
+              if: steps.version.outputs.version != ''
+              run: pnpm version "${{ steps.version.outputs.version }}" --no-git-tag-version --allow-same-version
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: pnpm typecheck
+            - name: Typecheck
+              run: pnpm typecheck
 
-      - name: Lint
-        run: pnpm check
+            - name: Lint
+              run: pnpm check
 
-      - name: Test
-        run: pnpm test
+            - name: Test
+              run: pnpm test
 
-      - name: Build
-        run: pnpm build
+            - name: Build
+              run: pnpm build
 
-      - name: Publish
-        run: pnpm publish --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - name: Publish
+              run: pnpm publish --no-git-checks
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
