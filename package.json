@@ -1,11 +1,23 @@
 {
-	"name": "web-crowd-detection-utils",
+	"name": "@kasumimercury/web-crowd-detection-utils",
 	"version": "0.0.0",
 	"description": "Reusable building blocks for browser-based crowd / person detection.",
 	"type": "module",
 	"sideEffects": false,
 	"license": "ISC",
 	"author": "",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/KasumiMercury/web-crowd-detection-utils.git"
+	},
+	"homepage": "https://github.com/KasumiMercury/web-crowd-detection-utils#readme",
+	"bugs": {
+		"url": "https://github.com/KasumiMercury/web-crowd-detection-utils/issues"
+	},
+	"publishConfig": {
+		"registry": "https://npm.pkg.github.com",
+		"access": "public"
+	},
 	"packageManager": "pnpm@10.33.2",
 	"engines": {
 		"node": ">=20"
