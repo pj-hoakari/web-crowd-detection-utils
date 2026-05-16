@@ -1,7 +1,22 @@
 /**
- * Hungarian algorithm for the linear assignment problem.
+ * Hungarian algorithm for the linear assignment problem. Used internally by
+ * {@link BYTETracker} to assign detections to tracks at each cascade stage.
+ *
+ * Not part of the public API.
+ *
+ * @internal
  */
 
+/**
+ * Solves the rectangular assignment problem on a (possibly non-square) cost
+ * matrix in `O((rows + cols) * rows * cols)` time. When `rows > cols` the
+ * matrix is transposed internally to keep the inner dimension small.
+ *
+ * @returns Array of `[rowIndex, colIndex]` pairs covering every row (or every
+ *   column, whichever is smaller).
+ *
+ * @internal
+ */
 function hungarian(cost: number[][]): [number, number][] {
 	const n = cost.length;
 	if (n === 0) return [];
@@ -80,12 +95,28 @@ function hungarian(cost: number[][]): [number, number][] {
 	return result;
 }
 
+/**
+ * Result of {@link linearAssignment}: optimal matches plus the indices that
+ * could not be matched within the threshold on either side.
+ *
+ * @internal
+ */
 export interface AssignmentResult {
+	/** Pairs `[rowIndex, colIndex]` of indices whose cost is at or below the threshold. */
 	matches: [number, number][];
+	/** Row indices with no acceptable match. */
 	unmatchedA: number[];
+	/** Column indices with no acceptable match. */
 	unmatchedB: number[];
 }
 
+/**
+ * Solves the assignment problem, then filters out matches whose cost exceeds
+ * `threshold`. Handles empty matrices and rectangular shapes; the optional
+ * `numCols` lets the caller assert the column count when `costMatrix` has zero rows.
+ *
+ * @internal
+ */
 export function linearAssignment(
 	costMatrix: number[][],
 	threshold: number,

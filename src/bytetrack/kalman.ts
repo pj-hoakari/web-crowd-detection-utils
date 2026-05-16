@@ -1,7 +1,17 @@
 /**
- * Kalman filter for object tracking.
- * State vector: [cx, cy, aspect_ratio, height, vx, vy, va, vh]
- * Measurement:  [cx, cy, aspect_ratio, height]
+ * 8-dimensional Kalman filter used internally by {@link BYTETracker} to
+ * smooth bounding boxes across frames and predict track positions during
+ * brief detection misses.
+ *
+ * - State vector: `[cx, cy, aspect_ratio, height, vx, vy, va, vh]`
+ *   (position + velocity for each measured dimension).
+ * - Measurement vector: `[cx, cy, aspect_ratio, height]`.
+ * - Noise standard deviations are proportional to box height, matching the
+ *   reference ByteTrack implementation.
+ *
+ * Not part of the public API; constructed once per `BYTETracker` instance.
+ *
+ * @internal
  */
 
 type Mat = number[][];
@@ -110,6 +120,11 @@ function inverse(m: Mat): Mat {
 const STD_WEIGHT_POSITION = 1 / 20;
 const STD_WEIGHT_VELOCITY = 1 / 160;
 
+/**
+ * Kalman filter instance. One per {@link BYTETracker}.
+ *
+ * @internal
+ */
 export class KalmanFilter {
 	private F: Mat;
 	private H: Mat;

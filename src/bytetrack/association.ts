@@ -1,6 +1,12 @@
 import type { STrack } from "./strack";
 import type { Observation } from "./types";
 
+/**
+ * IoU of two `xyxy` boxes. Uses an `+ 1e-7` denominator guard to avoid NaN
+ * when both boxes are degenerate.
+ *
+ * @internal
+ */
 function iouSingle(
 	a: [number, number, number, number],
 	b: [number, number, number, number],
@@ -17,6 +23,12 @@ function iouSingle(
 	return inter / (areaA + areaB - inter + 1e-7);
 }
 
+/**
+ * Builds the `tracks.length × observations.length` cost matrix of
+ * `1 - IoU` values for use as input to the Hungarian assignment.
+ *
+ * @internal
+ */
 export function iouDistance(
 	tracks: STrack[],
 	observations: Observation[],
@@ -27,10 +39,21 @@ export function iouDistance(
 	});
 }
 
+/**
+ * Track × track `1 - IoU` cost matrix, used by {@link removeDuplicateStracks}.
+ *
+ * @internal
+ */
 function iouDistanceTracks(a: STrack[], b: STrack[]): number[][] {
 	return a.map((ta) => b.map((tb) => 1 - iouSingle(ta.bbox, tb.bbox)));
 }
 
+/**
+ * Set union of two track lists keyed by `trackId`; entries in `a` take
+ * precedence over identically-IDed entries in `b`.
+ *
+ * @internal
+ */
 export function jointStracks(a: STrack[], b: STrack[]): STrack[] {
 	const ids = new Set(a.map((t) => t.trackId));
 	const result = [...a];
@@ -43,11 +66,23 @@ export function jointStracks(a: STrack[], b: STrack[]): STrack[] {
 	return result;
 }
 
+/**
+ * Set difference: returns entries of `a` whose `trackId` does not appear in `b`.
+ *
+ * @internal
+ */
 export function subStracks(a: STrack[], b: STrack[]): STrack[] {
 	const ids = new Set(b.map((t) => t.trackId));
 	return a.filter((t) => !ids.has(t.trackId));
 }
 
+/**
+ * Drops pairs of tracks across `a` and `b` whose IoU distance is below
+ * `duplicateIouThresh`. When two tracks are deemed duplicates, the one with
+ * the shorter lifetime (`endFrame - startFrame`) is removed.
+ *
+ * @internal
+ */
 export function removeDuplicateStracks(
 	a: STrack[],
 	b: STrack[],

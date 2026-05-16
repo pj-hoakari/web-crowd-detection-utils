@@ -2,6 +2,13 @@ import type { KalmanFilter } from "./kalman";
 import type { Observation } from "./types";
 import { TrackState } from "./types";
 
+/**
+ * Converts an `xyxy` {@link Observation} to the `(cx, cy, aspect, h)` measurement
+ * vector expected by {@link KalmanFilter}. Aspect ratio falls back to width
+ * when height is zero to avoid division-by-zero.
+ *
+ * @internal
+ */
 function detToXyah(obs: Observation): number[] {
 	const cx = (obs.x1 + obs.x2) / 2;
 	const cy = (obs.y1 + obs.y2) / 2;
@@ -10,6 +17,12 @@ function detToXyah(obs: Observation): number[] {
 	return [cx, cy, w / (h || 1), h];
 }
 
+/**
+ * Inverse of {@link detToXyah}: converts the Kalman state vector back to
+ * `(x1, y1, x2, y2)` for IoU computation and tracker output.
+ *
+ * @internal
+ */
 function xyahToXyxy(mean: number[]): [number, number, number, number] {
 	const cx = mean[0] as number;
 	const cy = mean[1] as number;
@@ -19,6 +32,15 @@ function xyahToXyxy(mean: number[]): [number, number, number, number] {
 	return [cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2];
 }
 
+/**
+ * A single tracklet maintained by {@link BYTETracker}: holds the Kalman state,
+ * lifecycle flags, the most recent {@link Observation} (used to pass extra
+ * fields like `classId` through to tracker output), and per-frame metadata.
+ *
+ * Not part of the public API — instances are created and owned by `BYTETracker`.
+ *
+ * @internal
+ */
 export class STrack {
 	trackId = 0;
 	isActivated = false;

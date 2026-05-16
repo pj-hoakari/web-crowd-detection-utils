@@ -27,6 +27,31 @@ import { STrack } from "./strack";
 import type { BYTETrackerOptions, Observation, TrackedBox } from "./types";
 import { TrackState } from "./types";
 
+/**
+ * Detector-agnostic multi-object tracker implementing the ByteTrack 3-stage
+ * association cascade with Kalman-filtered state.
+ *
+ * Each frame's detections are partitioned by score, then matched against
+ * existing tracks in three stages (high-conf × all, low-conf × remaining,
+ * high-conf × unconfirmed). Lost tracks are retained for {@link BYTETrackerOptions.trackBuffer}
+ * frames to allow re-identification across short occlusions.
+ *
+ * The tracker is stateful: each {@link BYTETracker.update} call mutates the
+ * internal track lists. Use {@link BYTETracker.reset} to start over.
+ *
+ * @example
+ * ```ts
+ * const tracker = new BYTETracker();
+ * for (const frame of frames) {
+ *   const detections = await detector.detect(frame); // Detection[] from yolo
+ *   const tracked = tracker.update(detections);
+ *   for (const t of tracked) {
+ *     console.log(t.trackId, t.x1, t.y1, t.x2, t.y2, t.classId);
+ *     //                                                ^^^^^^^ preserved from Detection
+ *   }
+ * }
+ * ```
+ */
 export class BYTETracker {
 	private trackedStracks: STrack[] = [];
 	private lostStracks: STrack[] = [];
@@ -35,19 +60,35 @@ export class BYTETracker {
 	private kf = new KalmanFilter();
 	private nextId = 1;
 
+	/** Score threshold separating high vs. low confidence observations. */
 	highThresh: number;
+	/** Stage 1 IoU-distance threshold (high-conf det × tracked + lost tracks). */
 	matchThresh: number;
+	/** Stage 2 IoU-distance threshold (low-conf det × remaining tracked tracks). */
 	secondMatchThresh: number;
+	/** Stage 3 IoU-distance threshold (remaining high-conf det × unconfirmed tracks). */
 	unconfirmedMatchThresh: number;
+	/** Minimum score required for an unmatched observation to spawn a new track. */
 	newTrackThresh: number;
+	/** IoU-distance threshold for duplicate-track suppression. */
 	duplicateIouThresh: number;
+	/** Number of frames a lost track is kept before removal. */
 	trackBuffer: number;
 
-	/** Total unique track IDs assigned so far. */
+	/**
+	 * Total number of unique track IDs assigned over the tracker's lifetime.
+	 *
+	 * Monotonically increasing across {@link BYTETracker.update} calls and reset
+	 * to `0` by {@link BYTETracker.reset}. Useful for crowd-counting workflows.
+	 */
 	get totalCount(): number {
 		return this.nextId - 1;
 	}
 
+	/**
+	 * @param opts - See {@link BYTETrackerOptions}. Any field omitted falls back
+	 *   to its corresponding `DEFAULT_*` constant.
+	 */
 	constructor(opts?: BYTETrackerOptions) {
 		this.highThresh = opts?.highThresh ?? DEFAULT_HIGH_THRESH;
 		this.matchThresh = opts?.matchThresh ?? DEFAULT_MATCH_THRESH;
@@ -61,6 +102,11 @@ export class BYTETracker {
 		this.trackBuffer = opts?.trackBuffer ?? DEFAULT_TRACK_BUFFER;
 	}
 
+	/**
+	 * Clears all track state and resets the frame counter and ID generator.
+	 * After this call, the next {@link BYTETracker.update} starts at frame 1
+	 * with `trackId` counting from `1`.
+	 */
 	reset(): void {
 		this.trackedStracks = [];
 		this.lostStracks = [];
@@ -70,19 +116,37 @@ export class BYTETracker {
 	}
 
 	/**
-	 * 1 フレーム分の観測結果を処理して、現在追跡中のトラックを返す。
+	 * Processes one frame of observations and returns the currently active tracks.
 	 *
-	 * 入力 `T` は `Observation` のフィールドを満たす任意の型。`T` の追加
-	 * フィールド (例: YOLO の `classId`) は最後にマッチした観測値から
-	 * 戻り値にコピーされる。`x1,y1,x2,y2,score,trackId` は ByteTrack
-	 * 側で確定するため、追加フィールドの同名キーは上書きされる。
+	 * Mutates the tracker's internal state: this is not a pure function. The
+	 * returned array contains only `Tracked + isActivated` entries; lost and
+	 * removed tracks are not surfaced.
 	 *
-	 * 処理フロー:
-	 *   Stage 1: 高信頼度観測 × 全トラック (tracked ∪ lost) の IoU マッチング
-	 *   Stage 2: 低信頼度観測 × Stage 1 でマッチしなかった tracked トラック
-	 *            (遮蔽から復帰した対象を拾う — ByteTrack の肝)
-	 *   Stage 3: Stage 1 でマッチしなかった高信頼度観測 × unconfirmed トラック
-	 *   後処理: 新トラック生成, lost 期限切れ削除, duplicate 除去
+	 * @typeParam T - Any subtype of {@link Observation}. Extra fields on `T`
+	 *   (e.g. YOLO's `classId`) are shallow-copied from the most recently
+	 *   matched observation onto the returned object. The canonical fields
+	 *   `x1, y1, x2, y2, score, trackId` are always set by the tracker and
+	 *   override any same-named field on `T`.
+	 *
+	 * @param observations - Detections for the current frame. Empty arrays are
+	 *   valid input and advance the frame counter without creating new tracks.
+	 * @returns Currently active tracks for this frame, each augmented with the
+	 *   pass-through fields from the last matching observation.
+	 *
+	 * @remarks
+	 * Algorithm (3-stage cascade — the "associate every detection" idea):
+	 * - **Stage 1:** High-confidence observations × all tracks (tracked ∪ lost),
+	 *   matched by IoU distance. Updates stable tracks and re-identifies lost
+	 *   tracks in one pass.
+	 * - **Stage 2:** Low-confidence observations × tracks left unmatched by
+	 *   Stage 1. Recovers occluded or partially visible objects whose score
+	 *   dropped this frame — the distinguishing idea of ByteTrack.
+	 * - **Stage 3:** High-confidence observations left over from Stage 1 ×
+	 *   unconfirmed tracks. Confirms candidates that appeared in the previous frame.
+	 *
+	 * Postprocessing per frame: spawn new tracks from unmatched detections
+	 * whose score clears `newTrackThresh`, age out lost tracks past
+	 * `trackBuffer`, and drop duplicate tracks within `duplicateIouThresh`.
 	 */
 	update<T extends Observation>(
 		observations: T[],
@@ -104,16 +168,15 @@ export class BYTETracker {
 			else unconfirmed.push(t);
 		}
 
-		// lost も候補に含める = 遮蔽後の re-ID を可能にする
+		// Include lost tracks in the candidate pool so that Stage 1 can
+		// re-identify objects coming back from occlusion.
 		const pool = jointStracks([...confirmed], [...this.lostStracks]);
 
 		for (const t of pool) t.predict(this.kf);
 		for (const t of unconfirmed) t.predict(this.kf);
 
-		/**
-		 * Stage 1: 高信頼度観測 × 全トラックプール (tracked + lost)
-		 * 安定した検出でトラックを更新し、lost トラックの再発見も同時に行う。
-		 */
+		// Stage 1: high-confidence observations × full pool (tracked + lost).
+		// Updates stable tracks and re-identifies lost tracks in a single pass.
 		const cost1 = iouDistance(pool, highDets);
 		const {
 			matches: m1,
@@ -133,10 +196,9 @@ export class BYTETracker {
 			}
 		}
 
-		/**
-		 * Stage 2: 低信頼度観測 × Stage 1 で余った tracked トラック
-		 * スコアが低くても IoU が高ければマッチさせ、遮蔽/部分可視な対象を継続追跡する。
-		 */
+		// Stage 2: low-confidence observations × tracked tracks left over from Stage 1.
+		// Even a low score is accepted if IoU is tight enough, keeping occluded
+		// or partially visible objects on their existing track.
 		const remainTracked = uTracks1
 			.map((i) => pool[i] as STrack)
 			.filter((t) => t.state === TrackState.Tracked);
@@ -162,10 +224,8 @@ export class BYTETracker {
 			}
 		}
 
-		/**
-		 * Stage 3: Stage 1 で余った高信頼度観測 × unconfirmed トラック
-		 * 直前フレームで初めて現れたトラック候補を確定させる。
-		 */
+		// Stage 3: high-confidence observations left over from Stage 1 × unconfirmed tracks.
+		// Confirms candidates that first appeared in the previous frame.
 		const remainDets = uDets1.map((i) => highDets[i] as T);
 		const cost3 = iouDistance(unconfirmed, remainDets);
 		const {

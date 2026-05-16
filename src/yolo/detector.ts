@@ -5,6 +5,53 @@ import type { Detection, YoloDetector, YoloDetectorOptions } from "./types";
 
 const DEFAULT_INPUT_SIZE = 640;
 
+/**
+ * Creates a high-level YOLO detector that wires together session
+ * initialization, preprocessing, inference, and postprocessing.
+ *
+ * Each `detect(imageData)` call runs the full pipeline:
+ * RGBA → CHW Float32 → `InferenceSession.run` → decode → {@link Detection}[].
+ *
+ * @param options - See {@link YoloDetectorOptions}. At minimum, `modelPath`
+ *   and `executionProvider` are required.
+ * @returns A {@link YoloDetector} ready for repeated `detect()` calls.
+ *
+ * @throws {Error} From `initSession` — e.g. when `"webgpu"` is requested but
+ *   `navigator.gpu` is unavailable.
+ * @throws {Error} If the loaded model exposes no input or output names.
+ * @throws {Error} From `detect()` — if `session.run` does not return the
+ *   expected output tensor.
+ *
+ * @remarks
+ * The detector owns a single preprocess buffer of size
+ * `3 * inputSize * inputSize` and reuses it across every `detect()` call to
+ * avoid per-frame allocation. Pass `options.preprocessBuffer` to provide an
+ * external buffer (e.g. to share with another consumer).
+ *
+ * Input `ImageData` passed to `detect()` must be exactly `inputSize × inputSize`.
+ * Use `createLetterboxCapturer` or `createCanvasFrameCapturer` from the
+ * `source` subpath to produce correctly-sized frames from video or images.
+ *
+ * Returned `Detection` coordinates are in **model input space**. Use
+ * `reverseLetterboxBox` (paired with a letterbox capturer) or
+ * `reverseStretchBox` (paired with a stretch capturer) to map them back to
+ * the original source dimensions.
+ *
+ * @example
+ * ```ts
+ * const detector = await createYoloDetector({
+ *   modelPath: "/models/yolov8n.onnx",
+ *   executionProvider: "webgpu",
+ *   inputSize: 640,
+ *   postprocess: { format: "auto", confThreshold: 0.25 },
+ * });
+ *
+ * const capturer = createLetterboxCapturer({ inputSize: 640 });
+ * const { imageData, params } = capturer.capture(videoElement);
+ * const inModelSpace = await detector.detect(imageData);
+ * const inSourceSpace = reverseLetterboxBoxes(inModelSpace, params);
+ * ```
+ */
 export async function createYoloDetector(
 	options: YoloDetectorOptions,
 ): Promise<YoloDetector> {
