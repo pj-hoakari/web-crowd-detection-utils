@@ -1,8 +1,16 @@
 import type { Detection, NmsOptions } from "./types";
 
+/** Default IoU threshold for greedy NMS. Matches the YOLO reference default. */
 export const DEFAULT_IOU_THRESHOLD = 0.45;
+
+/** Default maximum number of detections kept after NMS. */
 export const DEFAULT_MAX_DETECTIONS = 30;
 
+/**
+ * Intersection-over-Union of two axis-aligned bounding boxes.
+ *
+ * @internal
+ */
 function iou(a: Detection, b: Detection): number {
 	const ix1 = Math.max(a.x1, b.x1);
 	const iy1 = Math.max(a.y1, b.y1);
@@ -16,6 +24,23 @@ function iou(a: Detection, b: Detection): number {
 	return interArea / (aArea + bArea - interArea);
 }
 
+/**
+ * Greedy Non-Maximum Suppression over a list of detections.
+ *
+ * Sorts the input by `score` descending, then keeps each box unless its IoU
+ * with any already-kept box exceeds `iouThreshold`. Iteration stops once
+ * `maxDetections` boxes have been kept.
+ *
+ * @param detections - Candidate detections. Not mutated; a shallow copy is sorted internally.
+ * @param options - IoU threshold and maximum detection cap. See defaults
+ *   {@link DEFAULT_IOU_THRESHOLD} and {@link DEFAULT_MAX_DETECTIONS}.
+ * @returns A new array of detections, ordered by score descending, with the
+ *   same `Detection` object references as the input (no deep copy).
+ *
+ * @remarks
+ * NMS is class-agnostic: boxes from different `classId`s suppress each other.
+ * If you need per-class NMS, split by `classId` and call this function per group.
+ */
 export function nms(
 	detections: Detection[],
 	options: NmsOptions = {},

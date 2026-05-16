@@ -7,8 +7,20 @@ import type {
 	PostprocessOptions,
 } from "./types";
 
+/** Default minimum confidence score for a detection to be kept. */
 export const DEFAULT_CONF_THRESHOLD = 0.15;
+
+/**
+ * Default output tensor format. `"end-to-end"` matches YOLO exports with a
+ * built-in NMS plugin.
+ */
 export const DEFAULT_FORMAT: OutputFormat = "end-to-end";
+
+/**
+ * Default class filter: keep only COCO class `0` (person), matching this
+ * package's crowd-detection focus. Pass `"all"` in {@link PostprocessOptions}
+ * to disable filtering.
+ */
 export const DEFAULT_CLASS_FILTER: ClassFilter = [0];
 
 interface ResolvedOptions {
@@ -78,6 +90,18 @@ function transposeEndToEnd(data: Float32Array, numBoxes: number): Float32Array {
 	return out;
 }
 
+/**
+ * Decodes the `"standard"` YOLO output (`[1, attrs, N]`) into a list of
+ * detections. Converts `cx, cy, w, h` to `x1, y1, x2, y2`, picks the argmax
+ * class, applies confidence and class filtering, and runs greedy NMS.
+ *
+ * Auto-detects whether class scores are raw logits or already-sigmoided
+ * probabilities by sampling the first few values. If any sample falls outside
+ * `[0, 1]`, sigmoid is applied to every score. This avoids requiring callers
+ * to know whether their exported model includes the final activation.
+ *
+ * @internal
+ */
 function postprocessStandard(
 	data: Float32Array,
 	numAttrs: number,
@@ -87,7 +111,6 @@ function postprocessStandard(
 	const numClasses = numAttrs - 4;
 	const candidates: Detection[] = [];
 
-	// Sample first few class scores to detect if sigmoid is needed
 	let needsSigmoid = false;
 	const sampleCount = Math.min(10, numBoxes);
 	for (let i = 0; i < sampleCount; i++) {
@@ -152,12 +175,32 @@ function transposeStandard(
 
 let autoFormatLogged = false;
 
+/**
+ * Logs the format chosen by `dispatchAuto` exactly once per module lifetime,
+ * to aid debugging without flooding the console on every frame.
+ *
+ * @internal
+ */
 function logAutoFormat(message: string, dims: readonly number[]): void {
 	if (autoFormatLogged) return;
 	autoFormatLogged = true;
 	console.log(`[yolo] postprocess: ${message}`, dims);
 }
 
+/**
+ * Inspects tensor shape and dispatches to the appropriate decoder.
+ *
+ * Heuristic:
+ * - `[1, N, 6]` → `"end-to-end"`
+ * - `[1, 6, N]` → `"end-to-end-transposed"`
+ * - `[1, attrs, N]` with `attrs < N` → `"standard"`
+ * - `[1, N, attrs]` with `N > attrs` → `"standard-transposed"`
+ * - `[N, 6]` → `"end-to-end"` (2D variant)
+ *
+ * Unrecognized shapes log a warning and return `[]`.
+ *
+ * @internal
+ */
 function dispatchAuto(output: ort.Tensor, opts: ResolvedOptions): Detection[] {
 	const data = output.data as Float32Array;
 	const dims = output.dims;
@@ -214,6 +257,45 @@ function shapeMismatch(format: OutputFormat, dims: readonly number[]): Error {
 	);
 }
 
+/**
+ * Decodes a raw YOLO output tensor into a list of {@link Detection}s in
+ * model input-space coordinates.
+ *
+ * Dispatches on `options.format`:
+ * - `"end-to-end"` / `"end-to-end-transposed"` — model output already contains
+ *   NMS-applied `[x1, y1, x2, y2, score, classId]` rows. The decoder skips
+ *   padding rows and applies confidence + class filtering.
+ * - `"standard"` / `"standard-transposed"` — model output is raw `cx, cy, w, h`
+ *   plus per-class scores. The decoder converts to xyxy, picks argmax class,
+ *   applies filters, and runs greedy NMS.
+ * - `"auto"` — Inspects the tensor shape and picks the best-fit format,
+ *   logging the choice once per module lifetime.
+ *
+ * @param output - YOLO output tensor with `data: Float32Array`. Common dims:
+ *   `[1, N, 6]`, `[1, 6, N]`, `[1, attrs, N]`, `[1, N, attrs]`, or `[N, 6]`.
+ * @param options - See {@link PostprocessOptions}.
+ * @returns Detections in **model input space** (`0..inputSize` per axis).
+ *   To map back to the original source image, use `reverseLetterboxBox` or
+ *   `reverseStretchBox` from the `source` subpath.
+ *
+ * @throws {Error} When a non-`"auto"` format is requested but the tensor shape
+ *   does not match the expected layout for that format.
+ *
+ * @remarks
+ * For the `"standard"` formats, class scores may be raw logits or already
+ * sigmoided; the decoder auto-detects by sampling and applies sigmoid only
+ * when needed. This avoids requiring callers to know their export pipeline.
+ *
+ * @example
+ * ```ts
+ * const tensor = (await session.run({ input }))[outputName];
+ * const detections = postprocess(tensor, {
+ *   format: "auto",
+ *   confThreshold: 0.25,
+ *   classFilter: [0], // person only
+ * });
+ * ```
+ */
 export function postprocess(
 	output: ort.Tensor,
 	options: PostprocessOptions = {},
