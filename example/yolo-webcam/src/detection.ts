@@ -1,13 +1,13 @@
-import { isWebGpuAvailable } from "web-crowd-detection-utils/onnx";
+import { isWebGpuAvailable } from "@kasumimercury/web-crowd-detection-utils/onnx";
 import {
 	createLetterboxCapturer,
 	reverseLetterboxBoxes,
-} from "web-crowd-detection-utils/source";
+} from "@kasumimercury/web-crowd-detection-utils/source";
 import {
 	createYoloDetector,
 	type Detection,
 	type YoloDetector,
-} from "web-crowd-detection-utils/yolo";
+} from "@kasumimercury/web-crowd-detection-utils/yolo";
 
 const INPUT_SIZE = 640;
 

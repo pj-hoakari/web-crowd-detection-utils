@@ -1,16 +1,16 @@
 import {
 	BYTETracker,
 	type TrackedBox,
-} from "web-crowd-detection-utils/bytetrack";
-import { isWebGpuAvailable } from "web-crowd-detection-utils/onnx";
+} from "@kasumimercury/web-crowd-detection-utils/bytetrack";
+import { isWebGpuAvailable } from "@kasumimercury/web-crowd-detection-utils/onnx";
 import {
 	createLetterboxCapturer,
 	reverseLetterboxBoxes,
-} from "web-crowd-detection-utils/source";
+} from "@kasumimercury/web-crowd-detection-utils/source";
 import {
 	createYoloDetector,
 	type YoloDetector,
-} from "web-crowd-detection-utils/yolo";
+} from "@kasumimercury/web-crowd-detection-utils/yolo";
 
 const INPUT_SIZE = 640;
 
