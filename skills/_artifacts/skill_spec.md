@@ -1,0 +1,123 @@
+# @kasumimercury/web-crowd-detection-utils — Skill Spec
+
+`@kasumimercury/web-crowd-detection-utils` is a browser-targeted TypeScript package that provides reusable building blocks for in-browser YOLO + ByteTrack crowd / person detection. It exposes four subpaths — `onnx` (model-agnostic onnxruntime-web wrapper), `yolo` (YOLO postprocess and high-level detector), `source` (frame capture and coordinate round-trip), and `bytetrack` (detector-agnostic multi-object tracker) — designed to be composed à la carte or used through `createYoloDetector` as a one-stop pipeline. The library is also a knowledge-consolidation point: PoC patterns are folded back into the package so consumers never need to drop down to `onnxruntime-web` directly.
+
+## Domains
+
+| Domain                 | Description                                                                                                                                          | Skills                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| detection-pipeline     | Composing preprocess + inference + postprocess to turn a frame into `Detection[]`. Spans the `yolo` subpath and its dependency on `onnx` primitives. | set-up-detection-pipeline, configure-yolo-postprocess           |
+| frame-acquisition      | Getting browser frames into model-expected shape (letterbox vs stretch) and round-tripping detection coordinates back to source space.               | handle-frame-coordinates                                        |
+| multi-object-tracking  | Turning per-frame `Detection[]` into stable, ID-bearing tracks via `BYTETracker`, including occlusion / re-identification semantics.                 | integrate-tracking                                              |
+| runtime-setup          | Initializing onnxruntime-web sessions in a browser-safe way (WebGPU/WASM, SSR, preprocess buffer ownership) for both YOLO and non-YOLO models.       | set-up-onnx-runtime                                             |
+
+## Skill Inventory
+
+| Skill                          | Type | Domain                | What it covers                                                                                                | Failure modes |
+| ------------------------------ | ---- | --------------------- | ------------------------------------------------------------------------------------------------------------- | ------------- |
+| set-up-detection-pipeline      | core | detection-pipeline    | `createYoloDetector` + capturer + reverse transform — happy-path wiring, backend choice                       | 5             |
+| configure-yolo-postprocess     | core | detection-pipeline    | `OutputFormat`, `postprocess`, `nms`, defaults, sigmoid auto-detection, `auto` heuristic limits               | 5             |
+| handle-frame-coordinates       | core | frame-acquisition     | `createLetterboxCapturer` ↔ `reverseLetterboxBox` pair, stretch pair, `computeLetterboxParams`                | 4             |
+| integrate-tracking             | core | multi-object-tracking | `BYTETracker`, stateful lifecycle, `Observation` / `Detection` compat, threshold roles, per-class pattern     | 7             |
+| set-up-onnx-runtime            | core | runtime-setup         | `initSession`, `isWebGpuAvailable`, `createPreprocessor`, SSR safety, owned `onnxruntime-web`, Worker boundary | 6             |
+
+## Failure Mode Inventory
+
+### set-up-detection-pipeline (5 failure modes)
+
+| #   | Mistake                                                       | Priority | Source                                                          | Cross-skill?                              |
+| --- | ------------------------------------------------------------- | -------- | --------------------------------------------------------------- | ----------------------------------------- |
+| 1   | Default format mismatches Ultralytics standard export         | CRITICAL | src/yolo/postprocess.ts:299                                     | configure-yolo-postprocess                |
+| 2   | Drawing detections without applying reverse transform         | CRITICAL | src/yolo/detector.ts:32-38                                      | handle-frame-coordinates                  |
+| 3   | Assuming WebGPU automatically falls back to WASM              | HIGH     | src/onnx/session.ts:35-39                                       | set-up-onnx-runtime                       |
+| 4   | Calling initSession or createYoloDetector at module top level | HIGH     | src/onnx/session.ts:17-23                                       | set-up-onnx-runtime                       |
+| 5   | Feeding mis-sized ImageData to detect()                       | HIGH     | src/onnx/preprocess.ts:32-39                                    | handle-frame-coordinates                  |
+
+### configure-yolo-postprocess (5 failure modes)
+
+| #   | Mistake                                                       | Priority | Source                                                                       | Cross-skill? |
+| --- | ------------------------------------------------------------- | -------- | ---------------------------------------------------------------------------- | ------------ |
+| 1   | Default classFilter silently drops every non-person detection | HIGH     | src/yolo/postprocess.ts:19-24                                                | —            |
+| 2   | Manually applying nms() after end-to-end postprocess          | MEDIUM   | src/yolo/types.ts:33-39                                                      | —            |
+| 3   | Setting confThreshold but expecting all candidates back       | MEDIUM   | src/yolo/postprocess.ts:53-81                                                | —            |
+| 4   | Overriding sigmoid handling by feeding pre-activated logits   | MEDIUM   | src/yolo/postprocess.ts:113-122                                              | —            |
+| 5   | Blind trust in `format: "auto"` on edge-shape models          | HIGH     | src/yolo/postprocess.ts:202-242 (dispatchAuto), maintainer interview         | —            |
+
+### handle-frame-coordinates (4 failure modes)
+
+| #   | Mistake                                            | Priority | Source                              | Cross-skill? |
+| --- | -------------------------------------------------- | -------- | ----------------------------------- | ------------ |
+| 1   | Mismatched capturer / reverse-transform pair       | CRITICAL | src/source/letterbox.ts:212-216     | —            |
+| 2   | Capturing before HTMLVideoElement metadata loads   | HIGH     | src/source/letterbox.ts:172-181     | —            |
+| 3   | Caching LetterboxParams across frames              | MEDIUM   | src/source/letterbox.ts:138-142     | —            |
+| 4   | Using stretch capture when aspect matters          | MEDIUM   | src/source/capture.ts:14-17         | —            |
+
+### integrate-tracking (7 failure modes)
+
+| #   | Mistake                                                    | Priority | Source                                                                                     | Cross-skill?              |
+| --- | ---------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------ | ------------------------- |
+| 1   | Calling tracker.update with model-space detections         | CRITICAL | example/yolo-bytetrack-video/src/detection.ts:50-54                                        | handle-frame-coordinates  |
+| 2   | Re-instantiating BYTETracker per frame                     | CRITICAL | src/bytetrack/tracker.ts:55-86                                                             | —                         |
+| 3   | Forgetting update mutates and pass-through fields preserve | MEDIUM   | src/bytetrack/tracker.ts:125-135                                                           | —                         |
+| 4   | Treating totalCount as pause-resume safe                   | MEDIUM   | src/bytetrack/tracker.ts:108-116                                                           | —                         |
+| 5   | Confusing highThresh and newTrackThresh roles              | MEDIUM   | src/bytetrack/types.ts:80-106                                                              | —                         |
+| 6   | Redundant Detection → Observation remapping                | HIGH     | src/yolo/types.ts:9-15 (compat note), src/bytetrack/tracker.ts:125-135 (pass-through)      | —                         |
+| 7   | Single tracker instance for multi-class detectors          | HIGH     | src/bytetrack/association.ts:30-39 (no classId), maintainer interview                      | —                         |
+
+### set-up-onnx-runtime (6 failure modes)
+
+| #   | Mistake                                                       | Priority | Source                                                       | Cross-skill? |
+| --- | ------------------------------------------------------------- | -------- | ------------------------------------------------------------ | ------------ |
+| 1   | Bypassing the library to call onnxruntime-web directly        | CRITICAL | src/onnx/session.ts (entry point), CLAUDE.md (design intent) | —            |
+| 2   | Adding onnxruntime-web to consumer package.json               | HIGH     | CLAUDE.md, package.json#dependencies                         | —            |
+| 3   | Importing onnxruntime-web at module top level                 | HIGH     | src/onnx/session.ts:17-23                                    | —            |
+| 4   | Trusting isWebGpuAvailable() as a 'safe to run' check         | HIGH     | src/onnx/backend.ts:8-12                                     | —            |
+| 5   | Forgetting Preprocessor buffer overwrite semantics            | HIGH     | src/onnx/preprocess.ts:96-110                                | —            |
+| 6   | Forcing executionProviders via sessionOptions with `as any`   | HIGH     | src/onnx/types.ts:38-45                                      | —            |
+
+## Tensions
+
+| Tension                                            | Skills                                                  | Agent implication                                                                                                                |
+| -------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Convenience default vs explicit-format-clarity     | set-up-detection-pipeline ↔ configure-yolo-postprocess  | Agent omits `format`; on a stock Ultralytics export this throws shape-mismatch and the lib looks broken.                         |
+| Stateful tracker vs functional-style pipelines     | integrate-tracking ↔ set-up-detection-pipeline          | Agent wraps detect+track as a pure function and re-instantiates BYTETracker per call; unique-ID counting silently fails.         |
+| Library-owned onnxruntime-web vs consumer pinning  | set-up-onnx-runtime                                     | Agent reflexively adds `onnxruntime-web` to consumer deps; double-bundle breaks at WASM load with opaque errors.                 |
+| Letterbox correctness vs stretch simplicity        | handle-frame-coordinates ↔ set-up-detection-pipeline    | Agent picks stretch for code brevity; recall drops on 16:9 sources, no error fires, behavior just looks worse than the example.  |
+
+## Cross-References
+
+| From                         | To                            | Reason                                                                                                            |
+| ---------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| set-up-detection-pipeline    | handle-frame-coordinates      | Every pipeline needs a capturer + reverse transform; letterbox vs stretch is part of pipeline setup.              |
+| set-up-detection-pipeline    | configure-yolo-postprocess    | First-pass uses defaults; the next YOLO version loaded triggers postprocess tuning.                               |
+| set-up-detection-pipeline    | set-up-onnx-runtime           | `createYoloDetector` wraps `initSession` + preprocessing; backend/SSR debugging requires the runtime mental model.|
+| integrate-tracking           | handle-frame-coordinates      | Tracker assumes stable coord space; reverse transforms must run before `update()`.                                |
+| integrate-tracking           | set-up-detection-pipeline     | Tracking layers on top of detection; master the detection path before adding state.                               |
+| configure-yolo-postprocess   | set-up-detection-pipeline     | Agents reach for postprocess tuning when the pipeline yields zero detections or shape errors.                     |
+| set-up-onnx-runtime          | set-up-detection-pipeline     | Non-YOLO ONNX usage shares preprocess + session primitives with the YOLO pipeline; patterns transfer both ways.   |
+
+## Subsystems & Reference Candidates
+
+| Skill                      | Subsystems                                                                                                          | Reference candidates                                                                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| set-up-detection-pipeline  | —                                                                                                                   | —                                                                                                                                                          |
+| configure-yolo-postprocess | OutputFormat variants (end-to-end, end-to-end-transposed, standard, standard-transposed, auto)                      | OutputFormat dispatch table: per-format expected tensor dims, sigmoid heuristic, `dispatchAuto` rules + known-edge-shape caveats                            |
+| handle-frame-coordinates   | Letterbox capturer + reverse pair, Canvas/stretch capturer + reverse pair                                           | LetterboxParams field reference and transform algebra                                                                                                      |
+| integrate-tracking         | —                                                                                                                   | BYTETrackerOptions threshold cheat-sheet (highThresh, matchThresh, secondMatchThresh, unconfirmedMatchThresh, newTrackThresh, duplicateIouThresh, trackBuffer) |
+| set-up-onnx-runtime        | —                                                                                                                   | InitSessionOptions field reference (graphOptimizationLevel, sessionOptions Omit); subpath Worker compatibility table                                       |
+
+## Recommended Skill File Structure
+
+- **Core skills:** `set-up-detection-pipeline`, `configure-yolo-postprocess`, `handle-frame-coordinates`, `integrate-tracking`, `set-up-onnx-runtime`
+- **Framework skills:** none — package is framework-agnostic; React appears only in example apps
+- **Lifecycle skills:** none in this pass — go-to-production / migration guides don't yet exist for this library
+- **Composition skills:** none — examples use React + Vite but the integration is generic enough that pulling it into a dedicated skill would be premature
+- **Reference files:** `configure-yolo-postprocess` (OutputFormat reference), `integrate-tracking` (BYTETrackerOptions reference), `set-up-onnx-runtime` (InitSessionOptions reference + subpath worker-safety table)
+
+## Composition Opportunities
+
+| Library          | Integration points                                                                                                 | Composition skill needed?                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| onnxruntime-web  | Owned dependency; consumers must not redeclare. `initSession` returns the raw `InferenceSession` for advanced use. | No — handled inside `set-up-onnx-runtime`. The CRITICAL "bypass" failure mode covers the boundary.        |
+| React + Vite     | Both example apps use them; pattern is `useRef` for video/canvas + `useEffect` lifecycle around AbortController.   | No (this pass) — pattern is generic browser-app glue, not specific to this library's surface.             |
+| Ultralytics CLI  | Model export step (`yolo export ... format=onnx`) is a prerequisite for using `createYoloDetector`.                | Maybe — `prepare-yolo-onnx-model` skill (export + place in /public) would unblock first-time consumers.   |
