@@ -13,11 +13,11 @@ type: core
 library: web-crowd-detection-utils
 library_version: "0.0.0"
 sources:
-  - "KasumiMercury/web-crowd-detection-utils:src/bytetrack/tracker.ts"
-  - "KasumiMercury/web-crowd-detection-utils:src/bytetrack/types.ts"
-  - "KasumiMercury/web-crowd-detection-utils:src/bytetrack/association.ts"
-  - "KasumiMercury/web-crowd-detection-utils:src/bytetrack/constants.ts"
-  - "KasumiMercury/web-crowd-detection-utils:example/yolo-bytetrack-video/src/detection.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/bytetrack/tracker.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/bytetrack/types.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/bytetrack/association.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/bytetrack/constants.ts"
+  - "pj-hoakari/web-crowd-detection-utils:example/yolo-bytetrack-video/src/detection.ts"
 ---
 
 # Integrate ByteTrack for stable IDs and crowd counting
@@ -32,7 +32,7 @@ import {
   type Observation,
   type TrackedBox,
   type BYTETrackerOptions,
-} from "@kasumimercury/web-crowd-detection-utils/bytetrack";
+} from "@pj-hoakari/web-crowd-detection-utils/bytetrack";
 
 const tracker = new BYTETracker(); // one instance, lives across all frames
 const uniqueIds = new Set<number>();
@@ -53,7 +53,7 @@ while (!signal.aborted) {
 ### Pass detections directly (no remap)
 
 ```ts
-import type { Detection } from "@kasumimercury/web-crowd-detection-utils/yolo";
+import type { Detection } from "@pj-hoakari/web-crowd-detection-utils/yolo";
 
 const dets: Detection[] = await detector.detect(imageData);
 // Detection is structurally compatible with Observation. classId is preserved

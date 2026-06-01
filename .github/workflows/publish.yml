@@ -27,7 +27,7 @@ jobs:
                   node-version: 24
                   cache: pnpm
                   registry-url: https://npm.pkg.github.com
-                  scope: "@kasumimercury"
+                  scope: "@pj-hoakari"
 
             - name: Resolve version
               id: version

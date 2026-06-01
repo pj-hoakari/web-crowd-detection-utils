@@ -14,11 +14,11 @@ type: core
 library: web-crowd-detection-utils
 library_version: "0.0.0"
 sources:
-  - "KasumiMercury/web-crowd-detection-utils:src/onnx/session.ts"
-  - "KasumiMercury/web-crowd-detection-utils:src/onnx/preprocess.ts"
-  - "KasumiMercury/web-crowd-detection-utils:src/onnx/backend.ts"
-  - "KasumiMercury/web-crowd-detection-utils:src/onnx/types.ts"
-  - "KasumiMercury/web-crowd-detection-utils:CLAUDE.md"
+  - "pj-hoakari/web-crowd-detection-utils:src/onnx/session.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/onnx/preprocess.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/onnx/backend.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/onnx/types.ts"
+  - "pj-hoakari/web-crowd-detection-utils:CLAUDE.md"
 ---
 
 # Set up onnxruntime-web for a custom (non-YOLO) model
@@ -37,7 +37,7 @@ import {
   type InitSessionOptions,
   type SessionResult,
   type ExecutionProvider,
-} from "@kasumimercury/web-crowd-detection-utils/onnx";
+} from "@pj-hoakari/web-crowd-detection-utils/onnx";
 
 const INPUT_SIZE = 640;
 
@@ -99,7 +99,7 @@ const float32 = rgbaToFloat32Chw(imageData, { inputSize: 640, buffer });
 ```ts
 // detection.ts — NO top-level imports of onnxruntime-web. Static import of the
 // onnx subpath is fine; the runtime import happens lazily inside initSession.
-import { initSession } from "@kasumimercury/web-crowd-detection-utils/onnx";
+import { initSession } from "@pj-hoakari/web-crowd-detection-utils/onnx";
 
 export async function loadDetector(modelPath: ArrayBuffer) {
   // First call dynamically imports onnxruntime-web; pays bundle fetch + WASM
@@ -142,7 +142,7 @@ Correct:
 
 ```ts
 // initSession is THE entry point. Improvements land here for every consumer.
-import { initSession } from "@kasumimercury/web-crowd-detection-utils/onnx";
+import { initSession } from "@pj-hoakari/web-crowd-detection-utils/onnx";
 const { session } = await initSession(modelPath, { executionProvider: "webgpu" });
 // For custom models, run session.run yourself; for YOLO use createYoloDetector.
 ```
@@ -159,7 +159,7 @@ Wrong:
 // consumer-app/package.json
 {
   "dependencies": {
-    "@kasumimercury/web-crowd-detection-utils": "^0.1.0",
+    "@pj-hoakari/web-crowd-detection-utils": "^0.1.0",
     "onnxruntime-web": "^1.24.0"   // do not add — owned by the library
   }
 }
@@ -170,7 +170,7 @@ Correct:
 ```jsonc
 {
   "dependencies": {
-    "@kasumimercury/web-crowd-detection-utils": "^0.1.0"
+    "@pj-hoakari/web-crowd-detection-utils": "^0.1.0"
   }
 }
 ```
@@ -195,7 +195,7 @@ Correct:
 
 ```ts
 // Let initSession do the dynamic import internally on first call
-import { initSession } from "@kasumimercury/web-crowd-detection-utils/onnx";
+import { initSession } from "@pj-hoakari/web-crowd-detection-utils/onnx";
 export async function load() {
   return initSession(path, { executionProvider: "webgpu" });
 }
