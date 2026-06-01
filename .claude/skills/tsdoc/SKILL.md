@@ -5,7 +5,7 @@ description: Write or revise TSDoc comments in this repository following the pro
 
 # TSDoc skill
 
-This skill applies the TSDoc conventions for `@kasumimercury/web-crowd-detection-utils`, a published browser-targeted npm package. The full canonical guidelines live in `docs/tsdoc-guidelines.md`; this file is the entry point Claude Code uses, but every rule below points back to that document.
+This skill applies the TSDoc conventions for `@pj-hoakari/web-crowd-detection-utils`, a published browser-targeted npm package. The full canonical guidelines live in `docs/tsdoc-guidelines.md`; this file is the entry point Claude Code uses, but every rule below points back to that document.
 
 ## When to use this skill
 

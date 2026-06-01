@@ -36,7 +36,7 @@ importers:
 
   example/yolo-bytetrack-video:
     dependencies:
-      '@kasumimercury/web-crowd-detection-utils':
+      '@pj-hoakari/web-crowd-detection-utils':
         specifier: workspace:*
         version: link:../..
       react:
@@ -67,7 +67,7 @@ importers:
 
   example/yolo-webcam:
     dependencies:
-      '@kasumimercury/web-crowd-detection-utils':
+      '@pj-hoakari/web-crowd-detection-utils':
         specifier: workspace:*
         version: link:../..
       react:

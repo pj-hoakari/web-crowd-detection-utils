@@ -1,6 +1,6 @@
 # TSDoc Guidelines
 
-Conventions for writing TSDoc in this repository. Applies to every `src/` file that contributes to the published surface (`@kasumimercury/web-crowd-detection-utils`).
+Conventions for writing TSDoc in this repository. Applies to every `src/` file that contributes to the published surface (`@pj-hoakari/web-crowd-detection-utils`).
 
 This document is **tool-neutral** — Claude Code, GitHub Copilot, and human contributors should all follow it. Claude Code loads it via `.claude/skills/tsdoc/SKILL.md`; other agents can reference it directly.
 
