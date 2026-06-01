@@ -6,17 +6,17 @@ description: >
   agent is setting up YOLO person/crowd detection in the browser for the first
   time, choosing executionProvider ("webgpu" / "wasm") with manual fallback,
   sizing inputSize, or wiring detect() into a requestAnimationFrame loop.
-  Covers the happy path through @kasumimercury/web-crowd-detection-utils/yolo
+  Covers the happy path through @pj-hoakari/web-crowd-detection-utils/yolo
   and /onnx and /source subpaths.
 type: core
 library: web-crowd-detection-utils
 library_version: "0.0.0"
 sources:
-  - "KasumiMercury/web-crowd-detection-utils:src/yolo/detector.ts"
-  - "KasumiMercury/web-crowd-detection-utils:src/yolo/index.ts"
-  - "KasumiMercury/web-crowd-detection-utils:src/yolo/types.ts"
-  - "KasumiMercury/web-crowd-detection-utils:src/onnx/session.ts"
-  - "KasumiMercury/web-crowd-detection-utils:example/yolo-webcam/src/detection.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/yolo/detector.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/yolo/index.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/yolo/types.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/onnx/session.ts"
+  - "pj-hoakari/web-crowd-detection-utils:example/yolo-webcam/src/detection.ts"
 ---
 
 # Set up a YOLO detection pipeline
@@ -26,15 +26,15 @@ Compose `createYoloDetector` (yolo subpath) with a capturer (source subpath) and
 ## Setup
 
 ```ts
-import { isWebGpuAvailable } from "@kasumimercury/web-crowd-detection-utils/onnx";
+import { isWebGpuAvailable } from "@pj-hoakari/web-crowd-detection-utils/onnx";
 import {
   createLetterboxCapturer,
   reverseLetterboxBoxes,
-} from "@kasumimercury/web-crowd-detection-utils/source";
+} from "@pj-hoakari/web-crowd-detection-utils/source";
 import {
   createYoloDetector,
   type Detection,
-} from "@kasumimercury/web-crowd-detection-utils/yolo";
+} from "@pj-hoakari/web-crowd-detection-utils/yolo";
 
 const INPUT_SIZE = 640;
 

@@ -12,9 +12,9 @@ type: core
 library: web-crowd-detection-utils
 library_version: "0.0.0"
 sources:
-  - "KasumiMercury/web-crowd-detection-utils:src/yolo/postprocess.ts"
-  - "KasumiMercury/web-crowd-detection-utils:src/yolo/nms.ts"
-  - "KasumiMercury/web-crowd-detection-utils:src/yolo/types.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/yolo/postprocess.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/yolo/nms.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/yolo/types.ts"
 ---
 
 # Configure YOLO postprocess for your model export
@@ -33,7 +33,7 @@ import {
   DEFAULT_CLASS_FILTER,      // [0] (COCO person)
   DEFAULT_IOU_THRESHOLD,     // 0.45
   DEFAULT_MAX_DETECTIONS,    // 30
-} from "@kasumimercury/web-crowd-detection-utils/yolo";
+} from "@pj-hoakari/web-crowd-detection-utils/yolo";
 
 // Most consumers go through createYoloDetector's postprocess field:
 const detector = await createYoloDetector({

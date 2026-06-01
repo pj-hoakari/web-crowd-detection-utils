@@ -13,9 +13,9 @@ type: core
 library: web-crowd-detection-utils
 library_version: "0.0.0"
 sources:
-  - "KasumiMercury/web-crowd-detection-utils:src/source/letterbox.ts"
-  - "KasumiMercury/web-crowd-detection-utils:src/source/capture.ts"
-  - "KasumiMercury/web-crowd-detection-utils:src/source/types.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/source/letterbox.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/source/capture.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/source/types.ts"
 ---
 
 # Round-trip frame coordinates between source and model space
@@ -34,7 +34,7 @@ import {
   computeLetterboxParams,
   type Box,
   type LetterboxParams,
-} from "@kasumimercury/web-crowd-detection-utils/source";
+} from "@pj-hoakari/web-crowd-detection-utils/source";
 
 const INPUT_SIZE = 640;
 

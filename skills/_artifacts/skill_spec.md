@@ -1,6 +1,6 @@
-# @kasumimercury/web-crowd-detection-utils — Skill Spec
+# @pj-hoakari/web-crowd-detection-utils — Skill Spec
 
-`@kasumimercury/web-crowd-detection-utils` is a browser-targeted TypeScript package that provides reusable building blocks for in-browser YOLO + ByteTrack crowd / person detection. It exposes four subpaths — `onnx` (model-agnostic onnxruntime-web wrapper), `yolo` (YOLO postprocess and high-level detector), `source` (frame capture and coordinate round-trip), and `bytetrack` (detector-agnostic multi-object tracker) — designed to be composed à la carte or used through `createYoloDetector` as a one-stop pipeline. The library is also a knowledge-consolidation point: PoC patterns are folded back into the package so consumers never need to drop down to `onnxruntime-web` directly.
+`@pj-hoakari/web-crowd-detection-utils` is a browser-targeted TypeScript package that provides reusable building blocks for in-browser YOLO + ByteTrack crowd / person detection. It exposes four subpaths — `onnx` (model-agnostic onnxruntime-web wrapper), `yolo` (YOLO postprocess and high-level detector), `source` (frame capture and coordinate round-trip), and `bytetrack` (detector-agnostic multi-object tracker) — designed to be composed à la carte or used through `createYoloDetector` as a one-stop pipeline. The library is also a knowledge-consolidation point: PoC patterns are folded back into the package so consumers never need to drop down to `onnxruntime-web` directly.
 
 ## Domains
 

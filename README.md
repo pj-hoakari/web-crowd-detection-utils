@@ -1,4 +1,4 @@
-# @kasumimercury/web-crowd-detection-utils
+# @pj-hoakari/web-crowd-detection-utils
 
 Browser-targeted TypeScript building blocks for in-browser YOLO + ByteTrack crowd / person detection.
 
@@ -6,10 +6,10 @@ Browser-targeted TypeScript building blocks for in-browser YOLO + ByteTrack crow
 
 | Import                                              | Purpose                                                                  |
 | --------------------------------------------------- | ------------------------------------------------------------------------ |
-| `@kasumimercury/web-crowd-detection-utils/yolo`     | High-level `createYoloDetector`, low-level `postprocess` / `nms`         |
-| `@kasumimercury/web-crowd-detection-utils/onnx`     | `onnxruntime-web` wrapper: `initSession`, `createPreprocessor`           |
-| `@kasumimercury/web-crowd-detection-utils/source`   | Letterbox / stretch capture and reverse-transform helpers                |
-| `@kasumimercury/web-crowd-detection-utils/bytetrack` | Detector-agnostic `BYTETracker` multi-object tracker                    |
+| `@pj-hoakari/web-crowd-detection-utils/yolo`     | High-level `createYoloDetector`, low-level `postprocess` / `nms`         |
+| `@pj-hoakari/web-crowd-detection-utils/onnx`     | `onnxruntime-web` wrapper: `initSession`, `createPreprocessor`           |
+| `@pj-hoakari/web-crowd-detection-utils/source`   | Letterbox / stretch capture and reverse-transform helpers                |
+| `@pj-hoakari/web-crowd-detection-utils/bytetrack` | Detector-agnostic `BYTETracker` multi-object tracker                    |
 
 ## AI coding agents
 
