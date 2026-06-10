@@ -5,6 +5,7 @@ export default defineConfig({
 		"src/index.ts",
 		"src/background/index.ts",
 		"src/bytetrack/index.ts",
+		"src/line-crossing/index.ts",
 		"src/onnx/index.ts",
 		"src/source/index.ts",
 		"src/yolo/index.ts",
