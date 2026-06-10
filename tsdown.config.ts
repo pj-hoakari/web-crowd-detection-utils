@@ -3,6 +3,7 @@ import { defineConfig } from "tsdown";
 export default defineConfig({
 	entry: [
 		"src/index.ts",
+		"src/background/index.ts",
 		"src/bytetrack/index.ts",
 		"src/onnx/index.ts",
 		"src/source/index.ts",

@@ -17,12 +17,12 @@ Each becomes an independent subpath export (e.g. `web-crowd-detection-utils/yolo
 - `bytetrack` — ByteTrack multi-object tracker (STrack, Kalman, Hungarian, 3-stage association). Detector-agnostic; consumes `Observation = {x1,y1,x2,y2,score}`.
 - `yolo` — YOLO-specific postprocess (3-format auto-dispatch: end-to-end `[N,6]` / transposed / standard `[attrs,N]`), NMS, person-class filter. Entry point in sandbox: `detectPersons(session, imageData, confThreshold)`.
 - `onnx` — Model-agnostic ONNX Runtime Web wrapper: session creation, backend selection (WebGPU primary / WASM fallback), RGBA→CHW preprocess.
-- `motion` — EMA background model for static-detection suppression. Depends only on `yolo/types` (`Detection`).
+- `background` — EMA background-subtraction model for static-detection suppression (ported from sandbox `motion`, renamed because it models the background rather than detecting motion). Detector-agnostic: consumes its own `ScoredBox = {x1,y1,x2,y2,score}`, not the YOLO `Detection`.
 - `render` — Canvas bounding-box drawing with per-track colors.
 - `source` — Camera / video-file input and per-frame capture.
 - `lines` — Line-related geometric utilities.
 
-**Layering rule (preserve from sandbox):** `onnx` is model-agnostic, `yolo` is the only layer that knows YOLO output formats, `bytetrack` is detector-agnostic, `motion` consumes only `Detection` types. When porting, keep these boundaries — do not let YOLO specifics leak into `onnx`, do not let detector specifics leak into `bytetrack`.
+**Layering rule (preserve from sandbox):** `onnx` is model-agnostic, `yolo` is the only layer that knows YOLO output formats, `bytetrack` is detector-agnostic, `background` is detector-agnostic (operates on its own `ScoredBox`, never imports a YOLO type). When porting, keep these boundaries — do not let YOLO specifics leak into `onnx`, do not let detector specifics leak into `bytetrack`.
 
 ## Commands
 

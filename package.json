@@ -33,6 +33,10 @@
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js"
 		},
+		"./background": {
+			"types": "./dist/background/index.d.ts",
+			"import": "./dist/background/index.js"
+		},
 		"./bytetrack": {
 			"types": "./dist/bytetrack/index.d.ts",
 			"import": "./dist/bytetrack/index.js"
