@@ -8,7 +8,7 @@ This package extracts the `src/lib/` modules of `web-crowd-detection-sandbox` in
 
 ## Status
 
-**Environment-only.** Tooling is configured (build, test, lint, typecheck all pass on an empty `src/index.ts`). No module has been ported yet. Subpath exports, peer dependencies, and per-module `tsdown` entries are added **incrementally as each module is implemented**, not up-front.
+**Porting in progress.** Tooling is configured (build, test, lint, typecheck all pass). Five modules are ported and published as subpath exports: `onnx`, `yolo`, `source`, `bytetrack`, and `background`. `render` and `lines` remain unported. Subpath exports, peer dependencies, and per-module `tsdown` entries are added **incrementally as each module is implemented**, not up-front.
 
 ## Modules to extract (from sandbox `src/lib/`)
 
