@@ -7,12 +7,14 @@
 # Revision: 2026-06-10 incremental pass — added the `background` subpath
 #   (BackgroundSubtractor) that landed in commit ade7557. The original
 #   2026-05-27 pass covered onnx / yolo / source / bytetrack.
+# Revision: 2026-06-10 incremental pass — added the `line-crossing` subpath
+#   (LineCrossingCounter; ported from sandbox `lines`, renamed for clarity).
 
 library:
   name: "@pj-hoakari/web-crowd-detection-utils"
   version: "0.0.0"
   repository: "https://github.com/pj-hoakari/web-crowd-detection-utils"
-  description: "Browser-targeted TypeScript building blocks for YOLO + ByteTrack crowd / person detection. Exposes five subpaths (onnx, yolo, source, bytetrack, background) that compose into a full detect-and-track pipeline with optional static-detection suppression."
+  description: "Browser-targeted TypeScript building blocks for YOLO + ByteTrack crowd / person detection. Exposes six subpaths (onnx, yolo, source, bytetrack, background, line-crossing) that compose into a full detect-track-and-count pipeline with optional static-detection suppression."
   primary_framework: "framework-agnostic"
 
 domains:
@@ -31,6 +33,9 @@ domains:
   - name: "Static-detection suppression"
     slug: "static-suppression"
     description: "Reducing false positives on static scenery by attenuating the confidence of detections that don't move, via the detector-agnostic EMA background model. Sits between detection and tracking, operating on its own ScoredBox in background-model pixel space."
+  - name: "Line-crossing counting"
+    slug: "line-crossing-counting"
+    description: "Counting tracked objects that cross virtual lines, with per-direction tallies, via the detector- and tracker-agnostic LineCrossingCounter. A post-tracking stage that operates on caller-anchored points in a coordinate space shared with the lines; drawing is out of scope."
 
 skills:
   - name: "Set up a YOLO detection pipeline"
@@ -674,6 +679,122 @@ skills:
         priority: "MEDIUM"
         status: "active"
 
+  - name: "Count tracked objects crossing virtual lines"
+    slug: "count-line-crossings"
+    domain: "line-crossing-counting"
+    description: "Tally how many tracked objects cross each virtual line, per direction, with LineCrossingCounter. A post-tracking stage: the caller reduces each tracked detection to an anchor point (e.g. foot) and passes { trackId, point } plus the lines (each defined by its two anchor endpoints). Detector- and tracker-agnostic, stateful, no drawing. Optional crossing-assist (rescue / cooldown) compensates for tracker ID churn."
+    type: "core"
+    covers:
+      - "LineCrossingCounter (update, getLineCount, getAllCounts, reset, resetCounts, clearPositions, removeLine)"
+      - "Line { id, p1, p2 } (two anchor endpoints), Point, TrackedPoint { trackId, point }, LineCount { forward, backward }"
+      - "Crossing test: side-of-line (2-D cross product) + segment intersection"
+      - "Statefulness: one instance per stream, prev-point comparison, caller-computed anchor"
+      - "Shared coordinate space (counter does no scaling)"
+      - "CrossingAssistConfig + DEFAULT_RESCUE_DISTANCE / DEFAULT_RESCUE_FRAMES / DEFAULT_COOLDOWN_FRAMES (rescue / cooldown)"
+    tasks:
+      - "Count people crossing an entry/exit line (in/out) on a tracked stream"
+      - "Add line-crossing counting after createYoloDetector + BYTETracker"
+      - "Enable crossing-assist to survive tracker ID switches at the line"
+      - "Reset counts / positions when switching sources or clips"
+    failure_modes:
+      - mistake: "Hand-rolling line-crossing detection instead of using LineCrossingCounter"
+        mechanism: "The package consolidates the proven crossing test (cross-product side + segment intersection) and the ID-churn assist (rescue / cooldown) inside LineCrossingCounter. Re-implementing it per app re-fragments that logic and usually drops the segment-intersection guard (counting points that cross the infinite line outside the segment) and the assist."
+        wrong_pattern: |
+          // App code re-implements side-of-line + prev-point tracking by hand,
+          // typically with no segment-intersection guard and no ID-churn assist.
+          const prev = new Map<number, { x: number; y: number }>();
+          for (const t of tracked) {
+            // manual cross product, manual counting, manual prevPoint bookkeeping...
+          }
+        correct_pattern: |
+          import { LineCrossingCounter } from "@pj-hoakari/web-crowd-detection-utils/line-crossing";
+          const counter = new LineCrossingCounter();
+          const points = tracked.map((t) => ({
+            trackId: t.trackId,
+            point: { x: (t.x1 + t.x2) / 2, y: t.y2 },
+          }));
+          counter.update(points, lines, { assist: { enabled: true } });
+        source: "maintainer interview (Q2), CLAUDE.md (lib-as-knowledge-sink design), src/line-crossing/counter.ts"
+        priority: "CRITICAL"
+        status: "active"
+      - mistake: "Points and lines in mismatched coordinate spaces"
+        mechanism: "LineCrossingCounter does no scaling — the tracked points and every Line endpoint must live in ONE coordinate space. Defining lines in detection (640) space while passing source-space points (or vice versa) tests crossings against the wrong geometry and silently produces wrong counts, with no error."
+        wrong_pattern: |
+          const lines = [{ id: "door", p1: { x: 320, y: 0 }, p2: { x: 320, y: 640 } }]; // 640 space
+          const sourceSpace = reverseLetterboxBoxes(dets, params);                       // 1280×720
+          const points = tracked.map((t) => ({
+            trackId: t.trackId, point: { x: (t.x1 + t.x2) / 2, y: t.y2 },
+          })); // tracked is in source space → mismatched with 640-space lines
+          counter.update(points, lines);
+        correct_pattern: |
+          // Keep lines and points in the SAME space. Define the lines in the space
+          // your tracked boxes use, then anchor points from those boxes.
+          const points = tracked.map((t) => ({
+            trackId: t.trackId, point: { x: (t.x1 + t.x2) / 2, y: t.y2 },
+          }));
+          counter.update(points, linesInTrackedSpace, { assist: { enabled: true } });
+        source: "src/line-crossing/types.ts:1-40 (Line / Point shared space), src/line-crossing/counter.ts (no scaling), maintainer interview (Q2)"
+        priority: "CRITICAL"
+        status: "active"
+        skills: ["count-line-crossings", "handle-frame-coordinates", "integrate-tracking"]
+      - mistake: "Re-instantiating LineCrossingCounter per frame"
+        mechanism: "The counter is stateful — it compares each track's point this frame against the point it held last frame. A per-frame instance has no previous point, so no crossing is ever detected and every line stays at zero."
+        wrong_pattern: |
+          for (const frame of frames) {
+            const counter = new LineCrossingCounter(); // fresh state every frame
+            counter.update(points, lines, { assist: { enabled: true } });
+            // counts never advance — no previous point to compare against
+          }
+        correct_pattern: |
+          const counter = new LineCrossingCounter(); // once, outside the loop
+          for (const frame of frames) {
+            counter.update(points, lines, { assist: { enabled: true } });
+          }
+        source: "src/line-crossing/counter.ts (prevPoint state across frames), maintainer interview (Q2)"
+        priority: "CRITICAL"
+        status: "active"
+      - mistake: "Expecting the counter to compute the anchor point itself"
+        mechanism: "update consumes TrackedPoint { trackId, point }, not bounding boxes — it never reads x1..y2. The anchor choice (foot, centroid, head) is the caller's. Passing raw tracked boxes is a type error, and casting around it leaves the counter reading undefined coordinates."
+        wrong_pattern: |
+          // Passing raw tracked boxes — the counter does not derive a point from them
+          counter.update(tracked as unknown as TrackedPoint[], lines);
+        correct_pattern: |
+          // Caller reduces each detection to ITS chosen anchor point (foot here)
+          const points = tracked.map((t) => ({
+            trackId: t.trackId,
+            point: { x: (t.x1 + t.x2) / 2, y: t.y2 },
+          }));
+          counter.update(points, lines);
+        source: "src/line-crossing/types.ts (TrackedPoint), src/line-crossing/counter.ts (update signature)"
+        priority: "HIGH"
+        status: "active"
+      - mistake: "Skipping crossing-assist under ID churn / misreading cooldown"
+        mechanism: "With assist off, a tracker ID switch at the line (track lost on one side, a new id appears on the other) is missed, and line jitter can double-count one person. Enabling assist turns on rescue (a new id inherits a just-lost track's history near the same point) and cooldown (repeat counts on the same line are suppressed for a few frames)."
+        wrong_pattern: |
+          // Assist off — an ID switch at the line is missed; jitter double-counts
+          counter.update(points, lines);
+        correct_pattern: |
+          counter.update(points, lines, {
+            // rescueDistance / rescueFrames / cooldownFrames default to proven values
+            assist: { enabled: true },
+          });
+        source: "src/line-crossing/counter.ts (rescue / cooldown), src/line-crossing/constants.ts, maintainer interview (Q3)"
+        priority: "MEDIUM"
+        status: "active"
+      - mistake: "Assuming forward always means left-to-right"
+        mechanism: "forward / backward are defined by the side transition relative to the directed line p1→p2 (the sign of the 2-D cross product), not by screen left/right. Swapping a line's p1 and p2 flips forward and backward, so an agent that hard-codes 'forward = entering' mislabels direction for some line orientations."
+        wrong_pattern: |
+          // Assuming forward is always the 'in' direction regardless of p1/p2 order
+          const entering = counter.getLineCount("door").forward;
+        correct_pattern: |
+          // Direction follows how YOU set p1/p2. Verify which side is "in" for your
+          // line orientation (or normalize p1/p2 so forward consistently = entering).
+          const { forward, backward } = counter.getLineCount("door");
+          const entering = forward; // only after confirming the p1→p2 orientation
+        source: "src/line-crossing/counter.ts (sideOf sign → forward/backward), src/line-crossing/types.ts (LineCount doc)"
+        priority: "MEDIUM"
+        status: "active"
+
 tensions:
   - name: "Convenience default vs explicit-format-clarity"
     skills: ["set-up-detection-pipeline", "configure-yolo-postprocess"]
@@ -699,6 +820,11 @@ tensions:
     skills: ["suppress-static-detections", "integrate-tracking"]
     description: "Background subtraction removes false positives on static scenery, but with the same alpha a genuinely stationary person merges into the background and is attenuated as 'static'."
     implication: "Agent enables suppressStatic to clean up posters / mannequins and silently drops people who stand still long enough to merge into the EMA background — the opposite of the crowd-counting goal."
+
+  - name: "Crossing accuracy vs tracker ID stability"
+    skills: ["count-line-crossings", "integrate-tracking"]
+    description: "Accurate per-line crossing counts depend on a single stable trackId persisting across the line; tracker tuning that is fine for live counts (short trackBuffer, strict newTrackThresh) increases ID switches exactly at the line."
+    implication: "An agent tunes the tracker for one goal (e.g. fewer ghost tracks) and silently degrades crossing accuracy; crossing-assist mitigates but cannot fully recover a lost ID."
 
 cross_references:
   - from: "set-up-detection-pipeline"
@@ -734,6 +860,18 @@ cross_references:
   - from: "integrate-tracking"
     to: "suppress-static-detections"
     reason: "Persistent ghost tracks on static scenery are often best fixed upstream by attenuating static detections before update()."
+  - from: "count-line-crossings"
+    to: "integrate-tracking"
+    reason: "Crossing counts require stable trackIds; the counter runs right after tracker.update and is only as good as the IDs it receives."
+  - from: "count-line-crossings"
+    to: "handle-frame-coordinates"
+    reason: "The counter does no scaling — its points and line endpoints must share one coordinate space, which is the space round-trip that skill governs."
+  - from: "count-line-crossings"
+    to: "suppress-static-detections"
+    reason: "Both are post-detection/post-tracking consumers in the same loop; suppression runs before tracking, crossing-counting after."
+  - from: "integrate-tracking"
+    to: "count-line-crossings"
+    reason: "Counting line crossings is a common downstream of tracking; the trackId stability the tracker provides directly determines crossing accuracy."
 
 gaps:
   - skill: "configure-yolo-postprocess"
@@ -759,4 +897,8 @@ gaps:
   - skill: "suppress-static-detections"
     question: "Intended downstream of suppressStatic's attenuated scores (cutout vs NMS vs re-threshold)?"
     context: "Resolved (Q3): the module attenuates score only; the consumer performs the actual exclusion (cutout / threshold) downstream. Captured as the 'expecting suppressStatic to drop boxes' failure mode."
+    status: "resolved"
+  - skill: "count-line-crossings"
+    question: "Recommended rescueDistance / rescueFrames / cooldownFrames per scene or frame rate?"
+    context: "Resolved (Q3): no prescription; the skill presents crossing-assist as a trade-off and uses sandbox-proven defaults (60 / 15 / 10), mirroring how suppress-static-detections handles tuning. Re-evaluate if a preset emerges."
     status: "resolved"
