@@ -10,6 +10,7 @@ Browser-targeted TypeScript building blocks for in-browser YOLO + ByteTrack crow
 | `@pj-hoakari/web-crowd-detection-utils/onnx`     | `onnxruntime-web` wrapper: `initSession`, `createPreprocessor`           |
 | `@pj-hoakari/web-crowd-detection-utils/source`   | Letterbox / stretch capture and reverse-transform helpers                |
 | `@pj-hoakari/web-crowd-detection-utils/bytetrack` | Detector-agnostic `BYTETracker` multi-object tracker                    |
+| `@pj-hoakari/web-crowd-detection-utils/background` | Detector-agnostic `BackgroundSubtractor` for static-detection suppression |
 
 ## AI coding agents
 
@@ -19,7 +20,7 @@ This package ships agent skills under `skills/`. If you use an AI coding agent (
 npx @tanstack/intent@latest install
 ```
 
-This wires the skills into your agent config so it loads the right SKILL.md (detection-pipeline setup, postprocess tuning, ByteTrack integration, etc.) when you ask for help with this library.
+This wires the skills into your agent config so it loads the right SKILL.md (detection-pipeline setup, postprocess tuning, ByteTrack integration, static-detection suppression, etc.) when you ask for help with this library.
 
 To browse the available skills:
 
