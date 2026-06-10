@@ -11,6 +11,7 @@ Browser-targeted TypeScript building blocks for in-browser YOLO + ByteTrack crow
 | `@pj-hoakari/web-crowd-detection-utils/source`   | Letterbox / stretch capture and reverse-transform helpers                |
 | `@pj-hoakari/web-crowd-detection-utils/bytetrack` | Detector-agnostic `BYTETracker` multi-object tracker                    |
 | `@pj-hoakari/web-crowd-detection-utils/background` | Detector-agnostic `BackgroundSubtractor` for static-detection suppression |
+| `@pj-hoakari/web-crowd-detection-utils/line-crossing` | Detector-agnostic `LineCrossingCounter`: count tracked points crossing anchor-defined lines |
 
 ## AI coding agents
 

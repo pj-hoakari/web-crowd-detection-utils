@@ -41,6 +41,10 @@
 			"types": "./dist/bytetrack/index.d.ts",
 			"import": "./dist/bytetrack/index.js"
 		},
+		"./line-crossing": {
+			"types": "./dist/line-crossing/index.d.ts",
+			"import": "./dist/line-crossing/index.js"
+		},
 		"./onnx": {
 			"types": "./dist/onnx/index.d.ts",
 			"import": "./dist/onnx/index.js"

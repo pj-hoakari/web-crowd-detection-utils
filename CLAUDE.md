@@ -8,7 +8,7 @@ This package extracts the `src/lib/` modules of `web-crowd-detection-sandbox` in
 
 ## Status
 
-**Porting in progress.** Tooling is configured (build, test, lint, typecheck all pass). Five modules are ported and published as subpath exports: `onnx`, `yolo`, `source`, `bytetrack`, and `background`. `render` and `lines` remain unported. Subpath exports, peer dependencies, and per-module `tsdown` entries are added **incrementally as each module is implemented**, not up-front.
+**Porting in progress.** Tooling is configured (build, test, lint, typecheck all pass). Six modules are ported and published as subpath exports: `onnx`, `yolo`, `source`, `bytetrack`, `background`, and `line-crossing`. Only `render` remains unported. Subpath exports, peer dependencies, and per-module `tsdown` entries are added **incrementally as each module is implemented**, not up-front.
 
 ## Modules to extract (from sandbox `src/lib/`)
 
@@ -20,9 +20,9 @@ Each becomes an independent subpath export (e.g. `web-crowd-detection-utils/yolo
 - `background` — EMA background-subtraction model for static-detection suppression (ported from sandbox `motion`, renamed because it models the background rather than detecting motion). Detector-agnostic: consumes its own `ScoredBox = {x1,y1,x2,y2,score}`, not the YOLO `Detection`.
 - `render` — Canvas bounding-box drawing with per-track colors.
 - `source` — Camera / video-file input and per-frame capture.
-- `lines` — Line-related geometric utilities.
+- `line-crossing` — Line-crossing counting (`LineCrossingCounter`): tallies tracked points crossing anchor-defined lines, with optional ID-churn assist (rescue / cooldown). Detector- and tracker-agnostic (consumes `{ trackId, point }` + `Line = {id, p1, p2}`); drawing is out of scope (lives in `render`). Ported from sandbox `src/lib/lines/`, renamed to make the purpose explicit (the subpath is `web-crowd-detection-utils/line-crossing`).
 
-**Layering rule (preserve from sandbox):** `onnx` is model-agnostic, `yolo` is the only layer that knows YOLO output formats, `bytetrack` is detector-agnostic, `background` is detector-agnostic (operates on its own `ScoredBox`, never imports a YOLO type). When porting, keep these boundaries — do not let YOLO specifics leak into `onnx`, do not let detector specifics leak into `bytetrack`.
+**Layering rule (preserve from sandbox):** `onnx` is model-agnostic, `yolo` is the only layer that knows YOLO output formats, `bytetrack` is detector-agnostic, `background` is detector-agnostic (operates on its own `ScoredBox`, never imports a YOLO type), `line-crossing` is detector- and tracker-agnostic (operates on its own `TrackedPoint` / `Line`, never imports a YOLO or ByteTrack type). When porting, keep these boundaries — do not let YOLO specifics leak into `onnx`, do not let detector specifics leak into `bytetrack`.
 
 ## Commands
 
