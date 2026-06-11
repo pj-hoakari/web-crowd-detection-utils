@@ -10,6 +10,8 @@ Browser-targeted TypeScript building blocks for in-browser YOLO + ByteTrack crow
 | `@pj-hoakari/web-crowd-detection-utils/onnx`     | `onnxruntime-web` wrapper: `initSession`, `createPreprocessor`           |
 | `@pj-hoakari/web-crowd-detection-utils/source`   | Letterbox / stretch capture and reverse-transform helpers                |
 | `@pj-hoakari/web-crowd-detection-utils/bytetrack` | Detector-agnostic `BYTETracker` multi-object tracker                    |
+| `@pj-hoakari/web-crowd-detection-utils/background` | Detector-agnostic `BackgroundSubtractor` for static-detection suppression |
+| `@pj-hoakari/web-crowd-detection-utils/line-crossing` | Detector-agnostic `LineCrossingCounter`: count tracked points crossing anchor-defined lines |
 
 ## AI coding agents
 
@@ -19,7 +21,7 @@ This package ships agent skills under `skills/`. If you use an AI coding agent (
 npx @tanstack/intent@latest install
 ```
 
-This wires the skills into your agent config so it loads the right SKILL.md (detection-pipeline setup, postprocess tuning, ByteTrack integration, etc.) when you ask for help with this library.
+This wires the skills into your agent config so it loads the right SKILL.md (detection-pipeline setup, postprocess tuning, ByteTrack integration, static-detection suppression, etc.) when you ask for help with this library.
 
 To browse the available skills:
 
@@ -31,6 +33,7 @@ npx @tanstack/intent list
 
 `example/yolo-webcam` — minimal YOLO person detection on a webcam stream.
 `example/yolo-bytetrack-video` — YOLO + ByteTrack stable-ID person counting on a video file.
+`example/crowd-line-counting` — the full pipeline (every subpath): YOLO + ByteTrack with `background` static-suppression and `line-crossing` to count people crossing a user-drawn line each way.
 
 ## License
 

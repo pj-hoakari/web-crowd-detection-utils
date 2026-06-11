@@ -8,21 +8,22 @@ This package extracts the `src/lib/` modules of `web-crowd-detection-sandbox` in
 
 ## Status
 
-**Environment-only.** Tooling is configured (build, test, lint, typecheck all pass on an empty `src/index.ts`). No module has been ported yet. Subpath exports, peer dependencies, and per-module `tsdown` entries are added **incrementally as each module is implemented**, not up-front.
+**Porting complete.** All in-scope modules are ported and published as subpath exports: `onnx`, `yolo`, `source`, `bytetrack`, `background`, and `line-crossing`; build, test, lint, and typecheck all pass. The sandbox `render` module (canvas bounding-box drawing) is **intentionally not ported** — rendering / drawing utilities are out of scope for this package and will not be lifted out of the sandbox. The "Adding a new module" workflow below is retained for reference in case a future non-rendering module is added.
 
-## Modules to extract (from sandbox `src/lib/`)
+## Modules (extracted from sandbox `src/lib/`)
 
-Each becomes an independent subpath export (e.g. `web-crowd-detection-utils/yolo`):
+Each is an independent subpath export (e.g. `web-crowd-detection-utils/yolo`):
 
 - `bytetrack` — ByteTrack multi-object tracker (STrack, Kalman, Hungarian, 3-stage association). Detector-agnostic; consumes `Observation = {x1,y1,x2,y2,score}`.
 - `yolo` — YOLO-specific postprocess (3-format auto-dispatch: end-to-end `[N,6]` / transposed / standard `[attrs,N]`), NMS, person-class filter. Entry point in sandbox: `detectPersons(session, imageData, confThreshold)`.
 - `onnx` — Model-agnostic ONNX Runtime Web wrapper: session creation, backend selection (WebGPU primary / WASM fallback), RGBA→CHW preprocess.
-- `motion` — EMA background model for static-detection suppression. Depends only on `yolo/types` (`Detection`).
-- `render` — Canvas bounding-box drawing with per-track colors.
+- `background` — EMA background-subtraction model for static-detection suppression (ported from sandbox `motion`, renamed because it models the background rather than detecting motion). Detector-agnostic: consumes its own `ScoredBox = {x1,y1,x2,y2,score}`, not the YOLO `Detection`.
 - `source` — Camera / video-file input and per-frame capture.
-- `lines` — Line-related geometric utilities.
+- `line-crossing` — Line-crossing counting (`LineCrossingCounter`): tallies tracked points crossing anchor-defined lines, with optional ID-churn assist (rescue / cooldown). Detector- and tracker-agnostic (consumes `{ trackId, point }` + `Line = {id, p1, p2}`); drawing is out of scope for this package. Ported from sandbox `src/lib/lines/`, renamed to make the purpose explicit (the subpath is `web-crowd-detection-utils/line-crossing`).
 
-**Layering rule (preserve from sandbox):** `onnx` is model-agnostic, `yolo` is the only layer that knows YOLO output formats, `bytetrack` is detector-agnostic, `motion` consumes only `Detection` types. When porting, keep these boundaries — do not let YOLO specifics leak into `onnx`, do not let detector specifics leak into `bytetrack`.
+**Not ported:** the sandbox `render` module (canvas bounding-box drawing with per-track colors). Rendering / drawing is intentionally out of scope — see Status.
+
+**Layering rule (preserve from sandbox):** `onnx` is model-agnostic, `yolo` is the only layer that knows YOLO output formats, `bytetrack` is detector-agnostic, `background` is detector-agnostic (operates on its own `ScoredBox`, never imports a YOLO type), `line-crossing` is detector- and tracker-agnostic (operates on its own `TrackedPoint` / `Line`, never imports a YOLO or ByteTrack type). Keep these boundaries — do not let YOLO specifics leak into `onnx`, do not let detector specifics leak into `bytetrack`.
 
 ## Commands
 
@@ -60,7 +61,7 @@ Do not pre-create empty entries or stub exports for modules that have not been p
 
 - **Biome:** tabs, double quotes, `organizeImports: on`. Same rules as sandbox.
 - **TypeScript:** `strict`, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`, `erasableSyntaxOnly`, `moduleResolution: bundler`, target `es2023`. Path alias `@/*` → `src/*`.
-- **Output:** ESM only, no CJS. The package is browser-first; pure-logic modules (`bytetrack`, `lines`) are isomorphic, but the package as a whole is not designed for Node consumers.
+- **Output:** ESM only, no CJS. The package is browser-first; pure-logic modules (`bytetrack`, `line-crossing`) are isomorphic, but the package as a whole is not designed for Node consumers.
 - **Side effects:** `package.json` declares `sideEffects: false` — keep it true. No top-level statements with side effects in modules.
 - **Tree-shake & code-split:** tsdown's defaults (`treeshake: true`, splitting always on) are relied upon. Don't add re-export-everything barrels at the package root that would defeat per-subpath tree shaking — use the subpath exports.
 - **Runtime deps via `dependencies` by default** so consumers don't need to redeclare them. `onnxruntime-web` is owned by this package; consumer apps must not add it themselves (version drift risk). Reserve `peerDependencies` for cases where the host app must control the version (e.g. a framework like React).

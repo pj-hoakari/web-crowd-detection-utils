@@ -1,6 +1,6 @@
 # @pj-hoakari/web-crowd-detection-utils — Skill Spec
 
-`@pj-hoakari/web-crowd-detection-utils` is a browser-targeted TypeScript package that provides reusable building blocks for in-browser YOLO + ByteTrack crowd / person detection. It exposes four subpaths — `onnx` (model-agnostic onnxruntime-web wrapper), `yolo` (YOLO postprocess and high-level detector), `source` (frame capture and coordinate round-trip), and `bytetrack` (detector-agnostic multi-object tracker) — designed to be composed à la carte or used through `createYoloDetector` as a one-stop pipeline. The library is also a knowledge-consolidation point: PoC patterns are folded back into the package so consumers never need to drop down to `onnxruntime-web` directly.
+`@pj-hoakari/web-crowd-detection-utils` is a browser-targeted TypeScript package that provides reusable building blocks for in-browser YOLO + ByteTrack crowd / person detection. It exposes six subpaths — `onnx` (model-agnostic onnxruntime-web wrapper), `yolo` (YOLO postprocess and high-level detector), `source` (frame capture and coordinate round-trip), `bytetrack` (detector-agnostic multi-object tracker), `background` (detector-agnostic EMA background model for static-detection suppression), and `line-crossing` (detector- and tracker-agnostic line-crossing counter) — designed to be composed à la carte or used through `createYoloDetector` as a one-stop pipeline. The library is also a knowledge-consolidation point: PoC patterns are folded back into the package so consumers never need to drop down to `onnxruntime-web` (or hand-roll background subtraction or line-crossing logic) directly.
 
 ## Domains
 
@@ -10,6 +10,8 @@
 | frame-acquisition      | Getting browser frames into model-expected shape (letterbox vs stretch) and round-tripping detection coordinates back to source space.               | handle-frame-coordinates                                        |
 | multi-object-tracking  | Turning per-frame `Detection[]` into stable, ID-bearing tracks via `BYTETracker`, including occlusion / re-identification semantics.                 | integrate-tracking                                              |
 | runtime-setup          | Initializing onnxruntime-web sessions in a browser-safe way (WebGPU/WASM, SSR, preprocess buffer ownership) for both YOLO and non-YOLO models.       | set-up-onnx-runtime                                             |
+| static-suppression     | Reducing false positives on static scenery by attenuating the confidence of detections that don't move, via the detector-agnostic EMA background model. | suppress-static-detections                                      |
+| line-crossing-counting | Counting tracked objects that cross virtual lines (per-direction tallies) via the detector- and tracker-agnostic LineCrossingCounter, after tracking.       | count-line-crossings                                            |
 
 ## Skill Inventory
 
@@ -20,6 +22,8 @@
 | handle-frame-coordinates       | core | frame-acquisition     | `createLetterboxCapturer` ↔ `reverseLetterboxBox` pair, stretch pair, `computeLetterboxParams`                | 4             |
 | integrate-tracking             | core | multi-object-tracking | `BYTETracker`, stateful lifecycle, `Observation` / `Detection` compat, threshold roles, per-class pattern     | 7             |
 | set-up-onnx-runtime            | core | runtime-setup         | `initSession`, `isWebGpuAvailable`, `createPreprocessor`, SSR safety, owned `onnxruntime-web`, Worker boundary | 6             |
+| suppress-static-detections     | core | static-suppression    | `BackgroundSubtractor`, model-space `suppressStatic` (score attenuation, not removal), warm-up/`reset()`, tuning | 6             |
+| count-line-crossings           | core | line-crossing-counting | `LineCrossingCounter`, caller-anchored `{trackId,point}` + `Line{p1,p2}`, side+segment crossing test, crossing-assist (rescue/cooldown) | 6             |
 
 ## Failure Mode Inventory
 
@@ -75,6 +79,28 @@
 | 5   | Forgetting Preprocessor buffer overwrite semantics            | HIGH     | src/onnx/preprocess.ts:96-110                                | —            |
 | 6   | Forcing executionProviders via sessionOptions with `as any`   | HIGH     | src/onnx/types.ts:38-45                                      | —            |
 
+### suppress-static-detections (6 failure modes)
+
+| #   | Mistake                                                      | Priority | Source                                                                | Cross-skill?                                       |
+| --- | ------------------------------------------------------------ | -------- | --------------------------------------------------------------------- | -------------------------------------------------- |
+| 1   | Hand-rolling background subtraction instead of the utility   | CRITICAL | maintainer interview, CLAUDE.md, src/background/subtractor.ts:10-47    | —                                                  |
+| 2   | Applying suppressStatic after the reverse transform          | CRITICAL | src/background/types.ts:1-21, subtractor.ts:122-127, interview         | handle-frame-coordinates, integrate-tracking       |
+| 3   | Expecting suppressStatic to drop boxes                       | HIGH     | src/background/subtractor.ts:200-241, maintainer interview            | —                                                  |
+| 4   | Suppressing on the warm-up frame / ignoring update() return  | HIGH     | src/background/subtractor.ts:104-167, :169-199                        | —                                                  |
+| 5   | Default alpha absorbs stationary people into the background  | MEDIUM   | src/background/constants.ts:13-30, maintainer interview              | —                                                  |
+| 6   | Not calling reset() after switching sources                  | MEDIUM   | src/background/subtractor.ts:243-253                                  | —                                                  |
+
+### count-line-crossings (6 failure modes)
+
+| #   | Mistake                                                      | Priority | Source                                                                | Cross-skill?                                       |
+| --- | ------------------------------------------------------------ | -------- | --------------------------------------------------------------------- | -------------------------------------------------- |
+| 1   | Hand-rolling line-crossing instead of the utility            | CRITICAL | maintainer interview, CLAUDE.md, src/line-crossing/counter.ts          | —                                                  |
+| 2   | Points and lines in mismatched coordinate spaces             | CRITICAL | src/line-crossing/types.ts, counter.ts (no scaling), interview         | handle-frame-coordinates, integrate-tracking       |
+| 3   | Re-instantiating LineCrossingCounter per frame               | CRITICAL | src/line-crossing/counter.ts (prevPoint state), interview              | —                                                  |
+| 4   | Expecting the counter to compute the anchor point itself     | HIGH     | src/line-crossing/types.ts (TrackedPoint), counter.ts                  | —                                                  |
+| 5   | Skipping crossing-assist under ID churn / cooldown misuse    | MEDIUM   | src/line-crossing/counter.ts, constants.ts, maintainer interview      | —                                                  |
+| 6   | Assuming forward always means left-to-right                  | MEDIUM   | src/line-crossing/counter.ts (sideOf sign), types.ts (LineCount)       | —                                                  |
+
 ## Tensions
 
 | Tension                                            | Skills                                                  | Agent implication                                                                                                                |
@@ -83,6 +109,8 @@
 | Stateful tracker vs functional-style pipelines     | integrate-tracking ↔ set-up-detection-pipeline          | Agent wraps detect+track as a pure function and re-instantiates BYTETracker per call; unique-ID counting silently fails.         |
 | Library-owned onnxruntime-web vs consumer pinning  | set-up-onnx-runtime                                     | Agent reflexively adds `onnxruntime-web` to consumer deps; double-bundle breaks at WASM load with opaque errors.                 |
 | Letterbox correctness vs stretch simplicity        | handle-frame-coordinates ↔ set-up-detection-pipeline    | Agent picks stretch for code brevity; recall drops on 16:9 sources, no error fires, behavior just looks worse than the example.  |
+| Static suppression vs stationary-crowd recall      | suppress-static-detections ↔ integrate-tracking         | Agent enables suppressStatic to kill poster/mannequin false positives; people who stand still merge into the EMA background and are silently dropped. |
+| Crossing accuracy vs tracker ID stability          | count-line-crossings ↔ integrate-tracking               | Agent tunes the tracker for one goal (fewer ghost tracks) and silently degrades crossing counts via ID switches at the line; assist mitigates but cannot fully recover a lost ID. |
 
 ## Cross-References
 
@@ -95,6 +123,14 @@
 | integrate-tracking           | set-up-detection-pipeline     | Tracking layers on top of detection; master the detection path before adding state.                               |
 | configure-yolo-postprocess   | set-up-detection-pipeline     | Agents reach for postprocess tuning when the pipeline yields zero detections or shape errors.                     |
 | set-up-onnx-runtime          | set-up-detection-pipeline     | Non-YOLO ONNX usage shares preprocess + session primitives with the YOLO pipeline; patterns transfer both ways.   |
+| suppress-static-detections   | handle-frame-coordinates      | suppressStatic must run in model-pixel space BEFORE the reverse transform; correct placement needs the space round-trip model. |
+| suppress-static-detections   | set-up-detection-pipeline     | Background subtraction slots into the detect loop right after `detect()`, reusing the same letterboxed frame.      |
+| suppress-static-detections   | integrate-tracking            | Suppression runs just before tracking; the attenuated, re-thresholded output is what `tracker.update` receives.    |
+| integrate-tracking           | suppress-static-detections    | Persistent ghost tracks on static scenery are often best fixed upstream by attenuating static detections.          |
+| count-line-crossings         | integrate-tracking            | Crossing counts require stable trackIds; the counter runs right after `tracker.update` and is only as good as them. |
+| count-line-crossings         | handle-frame-coordinates      | The counter does no scaling — its points and line endpoints must share one coordinate space.                       |
+| count-line-crossings         | suppress-static-detections    | Both are post-detection/post-tracking consumers in the same loop (suppress before tracking, count after).          |
+| integrate-tracking           | count-line-crossings          | Line-crossing counting is a common downstream of tracking; trackId stability determines crossing accuracy.         |
 
 ## Subsystems & Reference Candidates
 
@@ -105,10 +141,12 @@
 | handle-frame-coordinates   | Letterbox capturer + reverse pair, Canvas/stretch capturer + reverse pair                                           | LetterboxParams field reference and transform algebra                                                                                                      |
 | integrate-tracking         | —                                                                                                                   | BYTETrackerOptions threshold cheat-sheet (highThresh, matchThresh, secondMatchThresh, unconfirmedMatchThresh, newTrackThresh, duplicateIouThresh, trackBuffer) |
 | set-up-onnx-runtime        | —                                                                                                                   | InitSessionOptions field reference (graphOptimizationLevel, sessionOptions Omit); subpath Worker compatibility table                                       |
+| suppress-static-detections | —                                                                                                                   | — (5-option config surface; no dense API or independent subsystems — no references/ file needed)                                                          |
+| count-line-crossings       | —                                                                                                                   | — (single counter + 3-field assist config; no dense API or independent subsystems — no references/ file needed)                                            |
 
 ## Recommended Skill File Structure
 
-- **Core skills:** `set-up-detection-pipeline`, `configure-yolo-postprocess`, `handle-frame-coordinates`, `integrate-tracking`, `set-up-onnx-runtime`
+- **Core skills:** `set-up-detection-pipeline`, `configure-yolo-postprocess`, `handle-frame-coordinates`, `integrate-tracking`, `set-up-onnx-runtime`, `suppress-static-detections`, `count-line-crossings`
 - **Framework skills:** none — package is framework-agnostic; React appears only in example apps
 - **Lifecycle skills:** none in this pass — go-to-production / migration guides don't yet exist for this library
 - **Composition skills:** none — examples use React + Vite but the integration is generic enough that pulling it into a dedicated skill would be premature

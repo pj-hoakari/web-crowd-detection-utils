@@ -214,7 +214,7 @@ These were real defects found during the TSDoc audit. Don't reintroduce them.
 
 - **Published version is a contract.** Changing TSDoc-documented behavior without bumping the version is a stealth breaking change. When fixing a defect, ask: was the previous behavior documented? If yes, the fix is breaking.
 - **IDE hover is the primary consumption surface.** Optimize for short, scannable text. Multi-paragraph `@remarks` are fine when warranted, but the summary line carries most of the weight.
-- **The layering rule (`onnx` model-agnostic / `yolo` knows formats / `bytetrack` detector-agnostic / `motion` consumes only `Detection`) is documented in `CLAUDE.md`.** TSDoc should reinforce these boundaries, never blur them.
+- **The layering rule (`onnx` model-agnostic / `yolo` knows formats / `bytetrack` detector-agnostic / `background` detector-agnostic, operating on its own `ScoredBox`) is documented in `CLAUDE.md`.** TSDoc should reinforce these boundaries, never blur them.
 
 ## Checklist before committing
 
