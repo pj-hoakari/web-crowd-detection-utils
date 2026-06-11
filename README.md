@@ -33,6 +33,7 @@ npx @tanstack/intent list
 
 `example/yolo-webcam` — minimal YOLO person detection on a webcam stream.
 `example/yolo-bytetrack-video` — YOLO + ByteTrack stable-ID person counting on a video file.
+`example/crowd-line-counting` — the full pipeline (every subpath): YOLO + ByteTrack with `background` static-suppression and `line-crossing` to count people crossing a user-drawn line each way.
 
 ## License
 
