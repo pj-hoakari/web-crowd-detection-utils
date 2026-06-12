@@ -10,6 +10,7 @@ export type {
 	Box,
 	CanvasFrameCapturer,
 	CanvasFrameCapturerOptions,
+	CaptureCanvas,
 	CaptureSource,
 	LetterboxCaptureResult,
 	LetterboxCapturer,

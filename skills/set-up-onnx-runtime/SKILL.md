@@ -8,8 +8,9 @@ description: >
   buffer ownership, or is tempted to import onnxruntime-web directly. Covers
   the lib-owns-onnxruntime-web contract (never bypass), Preprocessor buffer
   overwrite semantics, InitSessionOptions and the omitted executionProviders
-  field, the Worker boundary (which subpaths are DOM-free), and dynamic-import
-  SSR safety.
+  field, Worker compatibility (every subpath runs in a Web Worker — the source
+  capturers use OffscreenCanvas — so only consumer-side captureStream() needs the
+  main thread), and dynamic-import SSR safety.
 type: core
 library: web-crowd-detection-utils
 library_version: "0.0.0"
@@ -110,7 +111,7 @@ export async function loadDetector(modelPath: ArrayBuffer) {
 // In a React component: call from useEffect / onClick, never during SSR render.
 ```
 
-### Worker compatibility — which subpaths are DOM-free
+### Worker compatibility — every subpath runs in a Web Worker
 
 | Subpath / API                                       | DOM-free | Worker-safe |
 | --------------------------------------------------- | -------- | ----------- |
@@ -118,10 +119,10 @@ export async function loadDetector(modelPath: ArrayBuffer) {
 | `onnx/session` (`initSession`)                      | Yes      | Yes (if ORT WASM/WebGPU paths configured in the worker) |
 | `bytetrack` (`BYTETracker`)                         | Yes      | Yes         |
 | `yolo/postprocess` (`postprocess`, `nms`)           | Yes      | Yes         |
-| `source` (`create*Capturer`)                        | **No** — uses `document.createElement("canvas")` | No |
+| `source` (`create*Capturer`)                        | Yes — prefers `OffscreenCanvas`, falls back to `document.createElement` | Yes (when the `OffscreenCanvas` constructor exists — covers all workers) |
 | `source/letterbox.ts:computeLetterboxParams`        | Yes      | Yes (pure function) |
 
-Typical workerization: capture on the main thread, transfer `ImageData` (and `LetterboxParams`) to a Worker that runs `initSession` + `detector.detect` + `tracker.update`.
+Since the OffscreenCanvas change, no subpath is main-thread-only. The capturers call `createScratchCanvas2D`, which allocates `new OffscreenCanvas(...)` whenever the constructor exists, so you can run the entire pipeline — capture included — inside a Worker. (You can still capture on the main thread and transfer `ImageData` plus `LetterboxParams` to a Worker that runs `initSession` + `detector.detect` + `tracker.update` if you prefer.) The one main-thread-only operation is consumer-side: `captureStream()` exists only on `HTMLCanvasElement`, so narrow `capturer.canvas` with `instanceof` before calling it — see `handle-frame-coordinates`.
 
 ## Common Mistakes
 

@@ -282,4 +282,57 @@ describe("createLetterboxCapturer", () => {
 			/2D rendering context/,
 		);
 	});
+
+	it("uses an OffscreenCanvas when available (worker-compatible)", () => {
+		// Simulate a Web Worker: OffscreenCanvas present (it is absent in the
+		// happy-dom test env by default), preferred over the DOM canvas.
+		const ctx = {
+			fillStyle: "",
+			drawImage: vi.fn(),
+			fillRect: vi.fn(),
+			getImageData: vi.fn(
+				(_x: number, _y: number, w: number, h: number) =>
+					({
+						data: new Uint8ClampedArray(w * h * 4),
+						width: w,
+						height: h,
+						colorSpace: "srgb",
+					}) as unknown as ImageData,
+			),
+		};
+		const getContext = vi.fn(() => ctx);
+		class MockOffscreenCanvas {
+			width: number;
+			height: number;
+			getContext = getContext;
+			constructor(w: number, h: number) {
+				this.width = w;
+				this.height = h;
+			}
+		}
+		vi.stubGlobal("OffscreenCanvas", MockOffscreenCanvas);
+		try {
+			const cap = createLetterboxCapturer({ inputSize: 320 });
+
+			expect(cap.canvas).toBeInstanceOf(MockOffscreenCanvas);
+			expect(cap.canvas.width).toBe(320);
+			expect(getContext).toHaveBeenCalledWith("2d", {
+				willReadFrequently: true,
+			});
+
+			const source = {
+				width: 640,
+				height: 480,
+			} as unknown as CanvasImageSource;
+			const { imageData, params } = cap.capture(source);
+
+			expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, 320, 320);
+			expect(ctx.drawImage).toHaveBeenCalledWith(source, 0, 40, 320, 240);
+			expect(imageData.width).toBe(320);
+			expect(params.scale).toBe(0.5);
+			expect(params.padY).toBe(40);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
 });

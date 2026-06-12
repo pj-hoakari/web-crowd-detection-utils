@@ -5,6 +5,10 @@
 
 `yolo-bytetrack-video` を拡張し、`background`（静止物の抑制）と `line-crossing`（ライン通過カウント）を追加した構成
 
+さらに、このサンプルは**パイプライン全体を Web Worker 上で実行し、オーバーレイ描画を `OffscreenCanvas` で行う**応用構成
+推論・追跡・計数・描画をすべてメインスレッドの外に出すことで、UI の応答性を保つ
+他のサンプル（`yolo-webcam` / `yolo-bytetrack-video`）はメインスレッドで動作するシンプル構成として維持している
+
 ## 使用しているサブパス
 
 | サブパス | 役割 |
@@ -16,7 +20,7 @@
 | `bytetrack` | `BYTETracker` で安定した track ID を付与 |
 | `line-crossing` | `LineCrossingCounter` でライン通過を方向別に集計 |
 
-## パイプライン（`src/detection.ts`）
+## パイプライン（`src/worker.ts`）
 
 1. `source` — フレームを `INPUT_SIZE`（640）へレターボックスキャプチャ
 2. `yolo` (+ `onnx`) — モデル入力空間で人物を検出
@@ -27,6 +31,22 @@
 
 > ライン（`Line`）と追跡点は同一座標空間（ソース空間 = 動画の解像度）で扱う
 > `LineCrossingCounter` はスケーリングを行わないため、ラインと点の座標空間を一致させる必要がある
+
+## アーキテクチャ（Web Worker + OffscreenCanvas）
+
+| ファイル | スレッド | 役割 |
+| --- | --- | --- |
+| `src/App.tsx` | メイン | UI・状態管理。`<canvas>` を `transferControlToOffscreen()` で Worker に委譲し、`<video>` のフレームを `createImageBitmap()` で取得して転送する。ライン描画のポインタ操作のみメインで処理 |
+| `src/worker.ts` | Worker | モデル読込・推論・追跡・計数、および委譲された `OffscreenCanvas` へのオーバーレイ描画 |
+| `src/protocol.ts` | 共有 | メイン ⇔ Worker のメッセージ型 |
+| `src/overlay.ts` | 共有 | 描画ヘルパー（Worker 側で `OffscreenCanvas` に描画。`clientToCanvas` のみメインで使用） |
+
+ポイント:
+
+- Worker 内には DOM が無いため、`source` の `createLetterboxCapturer` が内部スクラッチに **`OffscreenCanvas` を自動選択**する（パッケージ側の対応による）
+- フレームは「Worker が処理中なら送らない」バックプレッシャ方式でドロップし、キューの肥大化を防ぐ
+- `transferControlToOffscreen()` はキャンバスごとに一度しか呼べないため、Worker 生成とキャンバス委譲は ref ガードで1回に限定（React StrictMode の二重実行対策）
+- `OffscreenCanvas` と WASM マルチスレッドのため、`vite.config.ts` で COOP/COEP ヘッダを設定済み
 
 ## ラインの操作
 
@@ -92,6 +112,6 @@ cd example/crowd-line-counting && pnpm dev
 ## 設定
 
 - モデル URL: `src/App.tsx` の `MODEL_URL`
-- 入力解像度・しきい値・抑制係数: `src/detection.ts` の `INPUT_SIZE` / `DETECT_CONF` / `SUPPRESS_FACTOR`
+- 入力解像度・しきい値・抑制係数: `src/worker.ts` の `INPUT_SIZE` / `DETECT_CONF` / `SUPPRESS_FACTOR`
 - 背景モデルのチューニング: `new BackgroundSubtractor({ alpha, diffThreshold, minForegroundRatio })`
 - crossing-assist のチューニング: `counter.update(points, lines, { assist: { rescueDistance, rescueFrames, cooldownFrames } })`

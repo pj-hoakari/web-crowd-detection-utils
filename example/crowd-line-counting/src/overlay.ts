@@ -11,9 +11,13 @@ import type {
  * `LineCrossingCounter` itself does no drawing (rendering is out of scope for
  * the package), so this example owns every pixel: tracked boxes, the counting
  * line, the foot anchor points the counter actually tests, and the per-line
- * tally. Both the running detection loop (`detection.ts`) and the idle preview
- * (`App.tsx`) draw through these helpers so the overlay looks identical whether
- * or not inference is running.
+ * tally.
+ *
+ * In this example all drawing happens **inside the Web Worker** on an
+ * `OffscreenCanvas` (see `worker.ts`), so the draw helpers are typed to accept
+ * either an on-screen or off-screen 2D context. `clientToCanvas` is the one
+ * exception: it runs on the main thread to map pointer events, and needs a real
+ * DOM `HTMLCanvasElement` for `getBoundingClientRect()`.
  */
 
 /** Crossings toward the line's positive side (`p1`→`p2`); rendered green. */
@@ -23,22 +27,34 @@ export const BACKWARD_COLOR = "#ffb020";
 const LINE_COLOR = "#39d0ff";
 const TRACK_COLOR = "#00ff88";
 
+/** A 2D context backing either an on-screen canvas or an `OffscreenCanvas`. */
+type OverlayContext =
+	| CanvasRenderingContext2D
+	| OffscreenCanvasRenderingContext2D;
+/** A canvas the overlay can draw onto, on the main thread or in a worker. */
+type OverlayCanvas = HTMLCanvasElement | OffscreenCanvas;
+
 /**
  * Maps a pointer's client coordinates to the canvas's internal pixel space.
  *
- * The overlay canvas is sized to the source video (`videoWidth × videoHeight`)
- * but displayed scaled by CSS, so a click's `clientX/clientY` must be divided
- * by that CSS scale to land in the same space the counting line and tracked
- * boxes live in.
+ * The overlay canvas is displayed scaled by CSS but its backing store is sized
+ * to the source video (`videoWidth × videoHeight`), so a click's
+ * `clientX/clientY` must be divided by the CSS scale to land in the same space
+ * the counting line and tracked boxes live in. Because the canvas is controlled
+ * by the worker (`transferControlToOffscreen`), its `width`/`height` are no
+ * longer readable on the main thread — the logical dimensions are passed in
+ * explicitly (the caller reads them from the `<video>` element).
  */
 export function clientToCanvas(
 	canvas: HTMLCanvasElement,
 	clientX: number,
 	clientY: number,
+	logicalWidth: number,
+	logicalHeight: number,
 ): Point {
 	const rect = canvas.getBoundingClientRect();
-	const scaleX = canvas.width / rect.width;
-	const scaleY = canvas.height / rect.height;
+	const scaleX = logicalWidth / rect.width;
+	const scaleY = logicalHeight / rect.height;
 	return {
 		x: (clientX - rect.left) * scaleX,
 		y: (clientY - rect.top) * scaleY,
@@ -46,10 +62,7 @@ export function clientToCanvas(
 }
 
 /** Clears the whole overlay. */
-export function clearCanvas(
-	ctx: CanvasRenderingContext2D,
-	canvas: HTMLCanvasElement,
-): void {
+export function clearCanvas(ctx: OverlayContext, canvas: OverlayCanvas): void {
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
@@ -59,8 +72,8 @@ export function clearCanvas(
  * is visible on screen.
  */
 export function drawTracks(
-	ctx: CanvasRenderingContext2D,
-	canvas: HTMLCanvasElement,
+	ctx: OverlayContext,
+	canvas: OverlayCanvas,
 	tracks: readonly TrackedBox[],
 ): void {
 	const fontSize = Math.max(12, Math.round(canvas.width / 60));
@@ -98,8 +111,8 @@ export function drawTracks(
  * arrow pointing toward the "forward" side, and the per-direction tally.
  */
 export function drawLine(
-	ctx: CanvasRenderingContext2D,
-	canvas: HTMLCanvasElement,
+	ctx: OverlayContext,
+	canvas: OverlayCanvas,
 	line: Line,
 	count: LineCount,
 ): void {
@@ -149,8 +162,8 @@ export function drawLine(
 
 /** Draws the in-progress (not yet committed) line as a dashed segment. */
 export function drawDraft(
-	ctx: CanvasRenderingContext2D,
-	canvas: HTMLCanvasElement,
+	ctx: OverlayContext,
+	canvas: OverlayCanvas,
 	p1: Point,
 	p2: Point,
 ): void {
@@ -177,7 +190,7 @@ export function drawDraft(
 
 /** @internal */
 function drawArrow(
-	ctx: CanvasRenderingContext2D,
+	ctx: OverlayContext,
 	x1: number,
 	y1: number,
 	x2: number,
@@ -214,7 +227,7 @@ function drawArrow(
 
 /** @internal */
 function drawCountBadge(
-	ctx: CanvasRenderingContext2D,
+	ctx: OverlayContext,
 	x: number,
 	y: number,
 	count: LineCount,

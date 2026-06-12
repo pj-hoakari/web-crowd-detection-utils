@@ -6,6 +6,10 @@
 #   6 skills is well under the 15+ threshold and there are no framework adapters.
 # Revision: 2026-06-10 incremental pass — added count-line-crossings for the
 #   `line-crossing` subpath (LineCrossingCounter). 7 skills, still flat/no-router.
+# Revision: 2026-06-12 diff-audit pass — reconciled with the OffscreenCanvas / Web
+#   Worker change (commit a11c5d0). No new skills; updated handle-frame-coordinates
+#   (CaptureCanvas + worker compatibility, added src/source/canvas.ts source) and
+#   set-up-onnx-runtime (worker-compatibility description). Still flat/no-router.
 library:
   name: "@pj-hoakari/web-crowd-detection-utils"
   version: "0.0.0"
@@ -66,11 +70,15 @@ skills:
       Choose between createLetterboxCapturer (aspect-preserving + reverseLetterboxBox)
       and createCanvasFrameCapturer (stretch + reverseStretchBox), and apply the
       MATCHING reverse transform. Covers computeLetterboxParams math, per-call params
-      re-evaluation, HTMLVideoElement metadata wait, CaptureSource type.
+      re-evaluation, HTMLVideoElement metadata wait, CaptureSource type, the
+      CaptureCanvas return type, and worker compatibility (capturers run in Web
+      Workers via OffscreenCanvas; narrow capturer.canvas with instanceof for
+      captureStream()).
     sources:
       - "pj-hoakari/web-crowd-detection-utils:src/source/letterbox.ts"
       - "pj-hoakari/web-crowd-detection-utils:src/source/capture.ts"
       - "pj-hoakari/web-crowd-detection-utils:src/source/types.ts"
+      - "pj-hoakari/web-crowd-detection-utils:src/source/canvas.ts"
 
   - name: "integrate-tracking"
     slug: "integrate-tracking"
@@ -103,7 +111,8 @@ skills:
       provider selection, SSR-safe dynamic import, InitSessionOptions and the
       omitted executionProviders field, Preprocessor buffer ownership/overwrite,
       the lib-owns-onnxruntime-web contract (never bypass to call ort directly),
-      Worker boundary (which subpaths are DOM-free).
+      and Worker compatibility (all subpaths run in a worker; source uses
+      OffscreenCanvas; only consumer-side captureStream() needs the main thread).
     sources:
       - "pj-hoakari/web-crowd-detection-utils:src/onnx/session.ts"
       - "pj-hoakari/web-crowd-detection-utils:src/onnx/preprocess.ts"
