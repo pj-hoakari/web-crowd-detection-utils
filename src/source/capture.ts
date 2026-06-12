@@ -1,3 +1,4 @@
+import { createScratchCanvas2D } from "./canvas";
 import type {
 	CanvasFrameCapturer,
 	CanvasFrameCapturerOptions,
@@ -19,14 +20,16 @@ import type {
  *   underlying canvas and 2D context are created once and reused across calls.
  *
  * @throws {Error} If `width` or `height` is not a positive finite number.
- * @throws {Error} If a 2D rendering context cannot be acquired from the
- *   internal canvas (e.g. when running outside a browser-like DOM).
+ * @throws {Error} If a 2D rendering context cannot be acquired, or if neither an
+ *   `OffscreenCanvas` constructor nor a DOM `document` is available (e.g. a bare
+ *   Node process).
  *
  * @remarks
- * Requires a DOM (`document.createElement`); this function does not work in
- * Node, Web Workers, or SSR contexts. The 2D context is created with
- * `willReadFrequently: true` so that repeated `getImageData` calls take the
- * CPU-readable path rather than copying back from the GPU.
+ * Works on the main thread and inside Web Workers: an `OffscreenCanvas` is used
+ * when its constructor is available (covering both contexts), falling back to a
+ * DOM `<canvas>` via `document.createElement` otherwise. The 2D context is
+ * created with `willReadFrequently: true` so that repeated `getImageData` calls
+ * take the CPU-readable path rather than copying back from the GPU.
  *
  * @example
  * ```ts
@@ -53,15 +56,11 @@ export function createCanvasFrameCapturer(
 		);
 	}
 
-	const canvas = document.createElement("canvas");
-	canvas.width = width;
-	canvas.height = height;
-	const ctx = canvas.getContext("2d", { willReadFrequently: true });
-	if (!ctx) {
-		throw new Error(
-			"createCanvasFrameCapturer: failed to acquire a 2D rendering context",
-		);
-	}
+	const { canvas, ctx } = createScratchCanvas2D(
+		width,
+		height,
+		"createCanvasFrameCapturer",
+	);
 
 	return {
 		canvas,

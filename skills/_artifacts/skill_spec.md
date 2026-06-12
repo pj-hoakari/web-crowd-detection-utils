@@ -19,9 +19,9 @@
 | ------------------------------ | ---- | --------------------- | ------------------------------------------------------------------------------------------------------------- | ------------- |
 | set-up-detection-pipeline      | core | detection-pipeline    | `createYoloDetector` + capturer + reverse transform — happy-path wiring, backend choice                       | 5             |
 | configure-yolo-postprocess     | core | detection-pipeline    | `OutputFormat`, `postprocess`, `nms`, defaults, sigmoid auto-detection, `auto` heuristic limits               | 5             |
-| handle-frame-coordinates       | core | frame-acquisition     | `createLetterboxCapturer` ↔ `reverseLetterboxBox` pair, stretch pair, `computeLetterboxParams`                | 4             |
+| handle-frame-coordinates       | core | frame-acquisition     | `createLetterboxCapturer` ↔ `reverseLetterboxBox` pair, stretch pair, `computeLetterboxParams`, `CaptureCanvas` (worker / OffscreenCanvas, narrow for `captureStream()`) | 5             |
 | integrate-tracking             | core | multi-object-tracking | `BYTETracker`, stateful lifecycle, `Observation` / `Detection` compat, threshold roles, per-class pattern     | 7             |
-| set-up-onnx-runtime            | core | runtime-setup         | `initSession`, `isWebGpuAvailable`, `createPreprocessor`, SSR safety, owned `onnxruntime-web`, Worker boundary | 6             |
+| set-up-onnx-runtime            | core | runtime-setup         | `initSession`, `isWebGpuAvailable`, `createPreprocessor`, SSR safety, owned `onnxruntime-web`, Worker compatibility (all subpaths run in a worker; source via OffscreenCanvas) | 6             |
 | suppress-static-detections     | core | static-suppression    | `BackgroundSubtractor`, model-space `suppressStatic` (score attenuation, not removal), warm-up/`reset()`, tuning | 6             |
 | count-line-crossings           | core | line-crossing-counting | `LineCrossingCounter`, caller-anchored `{trackId,point}` + `Line{p1,p2}`, side+segment crossing test, crossing-assist (rescue/cooldown) | 6             |
 
@@ -47,14 +47,15 @@
 | 4   | Overriding sigmoid handling by feeding pre-activated logits   | MEDIUM   | src/yolo/postprocess.ts:113-122                                              | —            |
 | 5   | Blind trust in `format: "auto"` on edge-shape models          | HIGH     | src/yolo/postprocess.ts:202-242 (dispatchAuto), maintainer interview         | —            |
 
-### handle-frame-coordinates (4 failure modes)
+### handle-frame-coordinates (5 failure modes)
 
 | #   | Mistake                                            | Priority | Source                              | Cross-skill? |
 | --- | -------------------------------------------------- | -------- | ----------------------------------- | ------------ |
 | 1   | Mismatched capturer / reverse-transform pair       | CRITICAL | src/source/letterbox.ts:212-216     | —            |
 | 2   | Capturing before HTMLVideoElement metadata loads   | HIGH     | src/source/letterbox.ts:172-181     | —            |
-| 3   | Caching LetterboxParams across frames              | MEDIUM   | src/source/letterbox.ts:138-142     | —            |
+| 3   | Caching LetterboxParams across frames              | MEDIUM   | src/source/letterbox.ts:139-141     | —            |
 | 4   | Using stretch capture when aspect matters          | MEDIUM   | src/source/capture.ts:14-17         | —            |
+| 5   | Calling `captureStream()` on `capturer.canvas` without narrowing | HIGH | src/source/types.ts:49-58,137-148   | set-up-onnx-runtime |
 
 ### integrate-tracking (7 failure modes)
 
@@ -140,7 +141,7 @@
 | configure-yolo-postprocess | OutputFormat variants (end-to-end, end-to-end-transposed, standard, standard-transposed, auto)                      | OutputFormat dispatch table: per-format expected tensor dims, sigmoid heuristic, `dispatchAuto` rules + known-edge-shape caveats                            |
 | handle-frame-coordinates   | Letterbox capturer + reverse pair, Canvas/stretch capturer + reverse pair                                           | LetterboxParams field reference and transform algebra                                                                                                      |
 | integrate-tracking         | —                                                                                                                   | BYTETrackerOptions threshold cheat-sheet (highThresh, matchThresh, secondMatchThresh, unconfirmedMatchThresh, newTrackThresh, duplicateIouThresh, trackBuffer) |
-| set-up-onnx-runtime        | —                                                                                                                   | InitSessionOptions field reference (graphOptimizationLevel, sessionOptions Omit); subpath Worker compatibility table                                       |
+| set-up-onnx-runtime        | —                                                                                                                   | InitSessionOptions field reference (graphOptimizationLevel, sessionOptions Omit); subpath Worker compatibility table (all subpaths run in a worker; source via OffscreenCanvas; only consumer-side captureStream() needs the main thread) |
 | suppress-static-detections | —                                                                                                                   | — (5-option config surface; no dense API or independent subsystems — no references/ file needed)                                                          |
 | count-line-crossings       | —                                                                                                                   | — (single counter + 3-field assist config; no dense API or independent subsystems — no references/ file needed)                                            |
 
@@ -150,7 +151,7 @@
 - **Framework skills:** none — package is framework-agnostic; React appears only in example apps
 - **Lifecycle skills:** none in this pass — go-to-production / migration guides don't yet exist for this library
 - **Composition skills:** none — examples use React + Vite but the integration is generic enough that pulling it into a dedicated skill would be premature
-- **Reference files:** `configure-yolo-postprocess` (OutputFormat reference), `integrate-tracking` (BYTETrackerOptions reference), `set-up-onnx-runtime` (InitSessionOptions reference + subpath worker-safety table)
+- **Reference files:** `configure-yolo-postprocess` (OutputFormat reference), `integrate-tracking` (BYTETrackerOptions reference), `set-up-onnx-runtime` (InitSessionOptions reference + subpath worker-compatibility table — all subpaths worker-capable, source via OffscreenCanvas)
 
 ## Composition Opportunities
 

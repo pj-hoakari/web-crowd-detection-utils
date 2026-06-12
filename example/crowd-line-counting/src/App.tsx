@@ -1,22 +1,17 @@
-import type { Line } from "@pj-hoakari/web-crowd-detection-utils/line-crossing";
+import type {
+	Line,
+	Point,
+} from "@pj-hoakari/web-crowd-detection-utils/line-crossing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
+import { BACKWARD_COLOR, clientToCanvas, FORWARD_COLOR } from "./overlay";
 import {
 	type Draft,
 	LINE_ID,
-	type PipelineConfig,
-	type PipelineControls,
+	type MainToWorker,
 	type PipelineStats,
-	startDetection,
-} from "./detection";
-import {
-	BACKWARD_COLOR,
-	clearCanvas,
-	clientToCanvas,
-	drawDraft,
-	drawLine,
-	FORWARD_COLOR,
-} from "./overlay";
+	type WorkerToMain,
+} from "./protocol";
 
 const MODEL_URL = `${import.meta.env.BASE_URL}models/yolo26n.onnx`;
 
@@ -32,8 +27,18 @@ const ZERO_STATS: PipelineStats = {
 function App() {
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const canvasRef = useRef<HTMLCanvasElement>(null);
-	const abortRef = useRef<AbortController | null>(null);
-	const controlsRef = useRef<PipelineControls | null>(null);
+	const workerRef = useRef<Worker | null>(null);
+	const rafIdRef = useRef<number | null>(null);
+	// Frame-loop is active; worker is busy with a frame; ended-listener handle.
+	const loopActiveRef = useRef(false);
+	const pendingRef = useRef(false);
+	const endedRef = useRef<(() => void) | null>(null);
+	// Model is loaded once (the worker is long-lived) + pending load promise.
+	const modelLoadedRef = useRef(false);
+	const modelReadyRef = useRef<{
+		resolve: () => void;
+		reject: (e: Error) => void;
+	} | null>(null);
 
 	const [videoFile, setVideoFile] = useState<File | null>(null);
 	const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -51,13 +56,69 @@ function App() {
 
 	const running = phase === "running" || phase === "preparing";
 
-	// Latest-value refs so the long-lived detection loop reads current UI state.
-	const lineRef = useRef<Line | null>(line);
-	lineRef.current = line;
-	const draftRef = useRef<Draft | null>(draft);
-	draftRef.current = draft;
-	const configRef = useRef<PipelineConfig>({ suppressStatic, crossingAssist });
-	configRef.current = { suppressStatic, crossingAssist };
+	const post = useCallback(
+		(msg: MainToWorker, transfer: Transferable[] = []) => {
+			workerRef.current?.postMessage(msg, transfer);
+		},
+		[],
+	);
+
+	// Create the worker once and hand it control of the overlay canvas. The
+	// canvas can only be transferred once for its lifetime, so this is guarded
+	// against React StrictMode's deliberate double-invoke. The worker lives for
+	// the page (App is the root component), so it is intentionally not terminated.
+	useEffect(() => {
+		if (workerRef.current) {
+			return;
+		}
+		const canvas = canvasRef.current;
+		if (!canvas) {
+			return;
+		}
+		const worker = new Worker(new URL("./worker.ts", import.meta.url), {
+			type: "module",
+		});
+		workerRef.current = worker;
+		worker.onmessage = (ev: MessageEvent<WorkerToMain>) => {
+			const msg = ev.data;
+			switch (msg.type) {
+				case "status":
+					setStatus(msg.message);
+					break;
+				case "ready":
+					modelReadyRef.current?.resolve();
+					modelReadyRef.current = null;
+					setStatus(`Running (backend: ${msg.backend})`);
+					break;
+				case "stats":
+					pendingRef.current = false;
+					setStats(msg.stats);
+					break;
+				case "error":
+					pendingRef.current = false;
+					if (modelReadyRef.current) {
+						// Failure during model load: reject so handleStart's catch reports it.
+						modelReadyRef.current.reject(new Error(msg.message));
+						modelReadyRef.current = null;
+					} else {
+						// Failure mid-run: halt the frame loop (refs only, no stale deps).
+						loopActiveRef.current = false;
+						if (rafIdRef.current !== null) {
+							cancelAnimationFrame(rafIdRef.current);
+							rafIdRef.current = null;
+						}
+						setPhase("error");
+						setStatus(`Error: ${msg.message}`);
+					}
+					break;
+			}
+		};
+		const offscreen = canvas.transferControlToOffscreen();
+		worker.postMessage(
+			{ type: "init", canvas: offscreen } satisfies MainToWorker,
+			[offscreen],
+		);
+	}, []);
 
 	useEffect(() => {
 		if (!videoFile) {
@@ -71,44 +132,100 @@ function App() {
 		};
 	}, [videoFile]);
 
-	const stop = useCallback(() => {
-		abortRef.current?.abort();
-		abortRef.current = null;
-		videoRef.current?.pause();
+	// Forward UI state to the worker. While idle the worker repaints on each of
+	// these so the overlay tracks the line/draft the user is setting up.
+	useEffect(() => {
+		post({ type: "setLine", line });
+	}, [line, post]);
+	useEffect(() => {
+		post({ type: "setDraft", draft });
+	}, [draft, post]);
+	useEffect(() => {
+		post({ type: "setConfig", config: { suppressStatic, crossingAssist } });
+	}, [suppressStatic, crossingAssist, post]);
+
+	const stopFrameLoop = useCallback(() => {
+		loopActiveRef.current = false;
+		if (rafIdRef.current !== null) {
+			cancelAnimationFrame(rafIdRef.current);
+			rafIdRef.current = null;
+		}
+		pendingRef.current = false;
 	}, []);
 
-	useEffect(() => stop, [stop]);
-
-	// While idle, the loop is not drawing — paint the committed line + draft here
-	// so the overlay still reflects the line the user is setting up.
-	useEffect(() => {
-		if (running) {
-			return;
-		}
-		const canvas = canvasRef.current;
-		if (!canvas) {
-			return;
-		}
+	const detachEnded = useCallback(() => {
 		const video = videoRef.current;
-		if (video && video.videoWidth > 0) {
-			canvas.width = video.videoWidth;
-			canvas.height = video.videoHeight;
+		if (video && endedRef.current) {
+			video.removeEventListener("ended", endedRef.current);
 		}
-		const ctx = canvas.getContext("2d");
-		if (!ctx) {
+		endedRef.current = null;
+	}, []);
+
+	const stopRun = useCallback(() => {
+		stopFrameLoop();
+		detachEnded();
+		post({ type: "stop" });
+		videoRef.current?.pause();
+	}, [stopFrameLoop, detachEnded, post]);
+
+	// Stop the loop on unmount (the worker itself is left running, see above).
+	useEffect(() => stopFrameLoop, [stopFrameLoop]);
+
+	const startFrameLoop = useCallback(() => {
+		const worker = workerRef.current;
+		if (!worker) {
 			return;
 		}
-		clearCanvas(ctx, canvas);
-		if (line) {
-			drawLine(ctx, canvas, line, {
-				forward: stats.forward,
-				backward: stats.backward,
+		loopActiveRef.current = true;
+		pendingRef.current = false;
+		const tick = () => {
+			if (!loopActiveRef.current) {
+				return;
+			}
+			const video = videoRef.current;
+			if (
+				video &&
+				video.readyState >= video.HAVE_CURRENT_DATA &&
+				!pendingRef.current
+			) {
+				// Grab a transferable snapshot and hand it to the worker. Drop frames
+				// while it is busy (pendingRef) so the queue can't grow unbounded.
+				pendingRef.current = true;
+				createImageBitmap(video)
+					.then((bitmap) => {
+						if (!loopActiveRef.current) {
+							bitmap.close();
+							pendingRef.current = false;
+							return;
+						}
+						worker.postMessage(
+							{ type: "frame", bitmap } satisfies MainToWorker,
+							[bitmap],
+						);
+					})
+					.catch(() => {
+						pendingRef.current = false;
+					});
+			}
+			rafIdRef.current = requestAnimationFrame(tick);
+		};
+		rafIdRef.current = requestAnimationFrame(tick);
+	}, []);
+
+	const ensureModel = useCallback(() => {
+		if (modelLoadedRef.current) {
+			return Promise.resolve();
+		}
+		return new Promise<void>((resolve, reject) => {
+			modelReadyRef.current = { resolve, reject };
+			post({
+				type: "loadModel",
+				modelUrl: new URL(MODEL_URL, window.location.href).href,
 			});
-		}
-		if (draft) {
-			drawDraft(ctx, canvas, draft.p1, draft.p2);
-		}
-	}, [running, line, draft, stats.forward, stats.backward]);
+		}).then(() => {
+			modelLoadedRef.current = true;
+		});
+	}, [post]);
 
 	const handleLoadedMetadata = useCallback(() => {
 		const video = videoRef.current;
@@ -117,21 +234,22 @@ function App() {
 		}
 		const w = video.videoWidth;
 		const h = video.videoHeight;
-		// Seed a default vertical line at the horizontal center so the example
-		// counts out of the box; the user can redraw it.
+		// Size the offscreen overlay to the source, then seed a default vertical
+		// line at the horizontal center so the example counts out of the box.
 		if (w > 0 && h > 0) {
+			post({ type: "resize", width: w, height: h });
 			setLine({
 				id: LINE_ID,
 				p1: { x: Math.round(w / 2), y: 0 },
 				p2: { x: Math.round(w / 2), y: h },
 			});
 		}
-	}, []);
+	}, [post]);
 
 	const handleFileChange = useCallback(
 		(e: React.ChangeEvent<HTMLInputElement>) => {
 			const file = e.target.files?.[0] ?? null;
-			stop();
+			stopRun();
 			setVideoFile(file);
 			setPhase("idle");
 			setStats(ZERO_STATS);
@@ -144,21 +262,24 @@ function App() {
 					: "No file selected.",
 			);
 		},
-		[stop],
+		[stopRun],
 	);
 
-	const commitLine = useCallback((p1: Draft["p1"], p2: Draft["p2"]) => {
-		// Ignore a degenerate (zero-length) line from a double-click in place.
-		if (p1.x === p2.x && p1.y === p2.y) {
-			return;
-		}
-		setLine({ id: LINE_ID, p1, p2 });
-		setDraft(null);
-		setDrawMode(false);
-		// A redrawn line is a fresh measurement: zero the tally (live + display).
-		controlsRef.current?.resetCounts();
-		setStats((s) => ({ ...s, forward: 0, backward: 0 }));
-	}, []);
+	const commitLine = useCallback(
+		(p1: Point, p2: Point) => {
+			// Ignore a degenerate (zero-length) line from a double-click in place.
+			if (p1.x === p2.x && p1.y === p2.y) {
+				return;
+			}
+			setLine({ id: LINE_ID, p1, p2 });
+			setDraft(null);
+			setDrawMode(false);
+			// A redrawn line is a fresh measurement: zero the tally (live + display).
+			post({ type: "resetCounts" });
+			setStats((s) => ({ ...s, forward: 0, backward: 0 }));
+		},
+		[post],
+	);
 
 	const handlePointerDown = useCallback(
 		(e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -166,10 +287,17 @@ function App() {
 				return;
 			}
 			const canvas = canvasRef.current;
-			if (!canvas) {
+			const video = videoRef.current;
+			if (!canvas || !video || video.videoWidth === 0) {
 				return;
 			}
-			const p = clientToCanvas(canvas, e.clientX, e.clientY);
+			const p = clientToCanvas(
+				canvas,
+				e.clientX,
+				e.clientY,
+				video.videoWidth,
+				video.videoHeight,
+			);
 			if (!draft) {
 				setDraft({ p1: p, p2: p });
 			} else {
@@ -185,10 +313,17 @@ function App() {
 				return;
 			}
 			const canvas = canvasRef.current;
-			if (!canvas) {
+			const video = videoRef.current;
+			if (!canvas || !video || video.videoWidth === 0) {
 				return;
 			}
-			const p = clientToCanvas(canvas, e.clientX, e.clientY);
+			const p = clientToCanvas(
+				canvas,
+				e.clientX,
+				e.clientY,
+				video.videoWidth,
+				video.videoHeight,
+			);
 			setDraft((d) => (d ? { p1: d.p1, p2: p } : d));
 		},
 		[drawMode, draft],
@@ -205,20 +340,21 @@ function App() {
 	}, []);
 
 	const handleResetCounts = useCallback(() => {
-		controlsRef.current?.resetCounts();
+		post({ type: "resetCounts" });
 		setStats((s) => ({ ...s, forward: 0, backward: 0 }));
-	}, []);
+	}, [post]);
 
 	const handleClearLine = useCallback(() => {
 		setLine(null);
 		setDraft(null);
 		setDrawMode(false);
-		controlsRef.current?.clearPositions();
+		post({ type: "clearPositions" });
 		setStats((s) => ({ ...s, forward: 0, backward: 0 }));
-	}, []);
+	}, [post]);
 
 	const handleStart = useCallback(async () => {
-		if (!videoRef.current || !canvasRef.current) {
+		const video = videoRef.current;
+		if (!video || !workerRef.current) {
 			return;
 		}
 		if (!videoFile) {
@@ -227,74 +363,49 @@ function App() {
 			return;
 		}
 		setPhase("preparing");
-		setStatus("Fetching model…");
+		setStatus("Loading model…");
 		setStats(ZERO_STATS);
 
-		const video = videoRef.current;
-		const canvas = canvasRef.current;
-		const controller = new AbortController();
-		abortRef.current = controller;
-
-		const handleEnded = () => {
-			controller.abort();
+		const onEnded = () => {
+			stopFrameLoop();
+			detachEnded();
+			post({ type: "stop" });
+			setPhase("finished");
+			setStatus("Finished.");
 		};
-		video.addEventListener("ended", handleEnded);
+		endedRef.current = onEnded;
+		video.addEventListener("ended", onEnded);
 
 		try {
-			const response = await fetch(MODEL_URL);
-			if (!response.ok) {
-				throw new Error(
-					`Failed to fetch ${MODEL_URL}: ${response.status} ${response.statusText}`,
-				);
-			}
-			const buffer = await response.arrayBuffer();
+			await ensureModel();
 
 			setStatus("Starting playback…");
 			video.currentTime = 0;
 			await video.play();
 
+			post({ type: "start" });
 			setPhase("running");
-
-			await startDetection({
-				modelBuffer: buffer,
-				video,
-				canvas,
-				signal: controller.signal,
-				getLine: () => lineRef.current,
-				getDraft: () => draftRef.current,
-				getConfig: () => configRef.current,
-				onControls: (c) => {
-					controlsRef.current = c;
-				},
-				onStatus: setStatus,
-				onStats: setStats,
-			});
+			startFrameLoop();
 		} catch (err) {
-			if (controller.signal.aborted) {
-				return;
-			}
+			detachEnded();
 			setPhase("error");
 			setStatus(`Error: ${(err as Error).message}`);
 			console.error(err);
-		} finally {
-			video.removeEventListener("ended", handleEnded);
-			if (controller.signal.aborted) {
-				if (video.ended) {
-					setPhase("finished");
-					setStatus("Finished.");
-				} else {
-					setPhase("idle");
-					setStatus("Stopped.");
-				}
-			}
 		}
-	}, [videoFile]);
+	}, [
+		videoFile,
+		ensureModel,
+		post,
+		startFrameLoop,
+		stopFrameLoop,
+		detachEnded,
+	]);
 
 	const handleStop = useCallback(() => {
-		stop();
+		stopRun();
 		setPhase("idle");
 		setStatus("Stopped.");
-	}, [stop]);
+	}, [stopRun]);
 
 	const canStart = !running && videoFile !== null;
 	const net = stats.forward - stats.backward;
@@ -304,8 +415,10 @@ function App() {
 			<header>
 				<h1>Crowd Line Counting</h1>
 				<p className="subtitle">
-					The full pipeline on a <strong>video file</strong>: <code>yolo</code>{" "}
-					+ <code>onnx</code> detection, <code>background</code>{" "}
+					The full pipeline on a <strong>video file</strong>, running entirely
+					in a <strong>Web Worker</strong> and rendering to an{" "}
+					<strong>OffscreenCanvas</strong>: <code>yolo</code> +{" "}
+					<code>onnx</code> detection, <code>background</code>{" "}
 					static-suppression, <code>source</code> letterbox capture,{" "}
 					<code>bytetrack</code> stable IDs, and <code>line-crossing</code>{" "}
 					counting people who cross the line each way.

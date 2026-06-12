@@ -276,5 +276,5 @@ See also: `configure-yolo-postprocess/SKILL.md` § Common Mistakes — `Blind tr
 
 - `handle-frame-coordinates/SKILL.md` — letterbox vs stretch capture and the paired reverse transform
 - `configure-yolo-postprocess/SKILL.md` — tuning OutputFormat, thresholds, NMS, and classFilter when the first-pass yields no detections or a shape error
-- `set-up-onnx-runtime/SKILL.md` — `initSession` and backend selection details when debugging at the runtime layer
+- `set-up-onnx-runtime/SKILL.md` — `initSession` and backend selection details when debugging at the runtime layer, plus § Worker compatibility (since the OffscreenCanvas change the whole pipeline, capture included, can run inside a Web Worker)
 - `integrate-tracking/SKILL.md` — adding `BYTETracker` on top of detections for stable IDs

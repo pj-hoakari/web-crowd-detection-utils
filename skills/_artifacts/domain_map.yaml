@@ -9,6 +9,12 @@
 #   2026-05-27 pass covered onnx / yolo / source / bytetrack.
 # Revision: 2026-06-10 incremental pass — added the `line-crossing` subpath
 #   (LineCrossingCounter; ported from sandbox `lines`, renamed for clarity).
+# Revision: 2026-06-12 diff-audit pass — reconciled with the OffscreenCanvas /
+#   Web Worker change (commit a11c5d0). source capturers now run in a worker via
+#   OffscreenCanvas: corrected the set-up-onnx-runtime worker-compatibility claim,
+#   added the CaptureCanvas covers entry + captureStream-narrowing failure mode to
+#   handle-frame-coordinates, and resolved the worker-support gap. Library still
+#   at 0.0.0 (package.json unchanged), so version fields are unchanged.
 
 library:
   name: "@pj-hoakari/web-crowd-detection-utils"
@@ -252,6 +258,7 @@ skills:
       - "computeLetterboxParams"
       - "LetterboxParams (scale, padX, padY, contentWidth, contentHeight)"
       - "CaptureSource (HTMLVideoElement, HTMLImageElement, VideoFrame, OffscreenCanvas)"
+      - "CaptureCanvas (HTMLCanvasElement | OffscreenCanvas — capturer.canvas return type; capturers run in Web Workers via OffscreenCanvas; narrow with instanceof for captureStream())"
     tasks:
       - "Choose between letterbox and stretch for a given source aspect ratio"
       - "Map detection coordinates back to source-image space for rendering"
@@ -301,7 +308,7 @@ skills:
           const { imageData, params } = capturer.capture(video);
           const dets = await detector.detect(imageData);
           const sourceSpace = reverseLetterboxBoxes(dets, params);
-        source: "src/source/letterbox.ts:138-142 (@remarks per-call re-evaluation)"
+        source: "src/source/letterbox.ts:139-141 (@remarks per-call re-evaluation)"
         priority: "MEDIUM"
         status: "active"
       - mistake: "Using stretch capture when aspect matters"
@@ -312,9 +319,27 @@ skills:
         correct_pattern: |
           // Letterbox preserves aspect with gray padding (YOLO standard)
           const capturer = createLetterboxCapturer({ inputSize: 640 });
-        source: "src/source/capture.ts:14-17 (@remarks 'stretched'), src/source/types.ts:12-15"
+        source: "src/source/capture.ts:14-17 (@remarks 'stretched'), src/source/types.ts:19-31 (CanvasFrameCapturerOptions / 'stretched')"
         priority: "MEDIUM"
         status: "active"
+      - mistake: "Calling captureStream() on capturer.canvas without narrowing"
+        mechanism: "Since the OffscreenCanvas change, capturer.canvas is CaptureCanvas (HTMLCanvasElement | OffscreenCanvas). OffscreenCanvas has no captureStream(), so an unguarded call fails to type-check and throws at runtime whenever the capturer took the OffscreenCanvas path (always, inside a Worker)."
+        wrong_pattern: |
+          const capturer = createLetterboxCapturer({ inputSize: 640 });
+          // captureStream() exists only on HTMLCanvasElement
+          const stream = capturer.canvas.captureStream(); // TS error; throws on OffscreenCanvas
+        correct_pattern: |
+          const { canvas } = capturer;
+          if (canvas instanceof HTMLCanvasElement) {
+            const stream = canvas.captureStream();
+            // ...
+          } else {
+            // OffscreenCanvas (worker / any thread with the constructor): captureStream() unavailable
+          }
+        source: "src/source/types.ts:49-58, 137-148 (@remarks narrow with instanceof), src/source/canvas.ts:47-82"
+        priority: "HIGH"
+        status: "active"
+        version_context: "Introduced by the 2026-06-12 OffscreenCanvas change (commit a11c5d0); capturer.canvas was HTMLCanvasElement before that."
 
   - name: "Integrate ByteTrack for stable IDs and crowd counting"
     slug: "integrate-tracking"
@@ -454,7 +479,7 @@ skills:
   - name: "Set up onnxruntime-web for a custom (non-YOLO) model"
     slug: "set-up-onnx-runtime"
     domain: "runtime-setup"
-    description: "Use the onnx subpath directly to run any browser-side ONNX model. Covers session creation, RGBA→CHW preprocessing, WebGPU/WASM selection, and SSR safety. Distinct from set-up-detection-pipeline because the user owns the postprocess step. Worker compatibility: preprocess + bytetrack + yolo/postprocess are DOM-free and run in a Web Worker; only the source subpath needs the main thread (document.createElement)."
+    description: "Use the onnx subpath directly to run any browser-side ONNX model. Covers session creation, RGBA→CHW preprocessing, WebGPU/WASM selection, and SSR safety. Distinct from set-up-detection-pipeline because the user owns the postprocess step. Worker compatibility: every subpath runs in a Web Worker — preprocess, bytetrack, and yolo/postprocess are DOM-free, and since the OffscreenCanvas change the source capturers also run in a worker (they use new OffscreenCanvas(...) when available, falling back to document.createElement only on the main thread). The only main-thread-only operation is consumer-side: captureStream() exists only on HTMLCanvasElement, so narrow capturer.canvas with instanceof first."
     type: "core"
     covers:
       - "initSession (string | ArrayBufferLike | Uint8Array modelPath)"
@@ -462,7 +487,7 @@ skills:
       - "createPreprocessor / createPreprocessBuffer / rgbaToFloat32Chw"
       - "InitSessionOptions (graphOptimizationLevel, sessionOptions, omitted executionProviders)"
       - "Preprocessor ownership / buffer overwrite semantics"
-      - "Worker boundary: which subpaths are DOM-free"
+      - "Worker compatibility: all subpaths run in a worker (source via OffscreenCanvas); only consumer-side captureStream() needs the main thread / instanceof narrowing"
     tasks:
       - "Run a non-YOLO segmentation or pose model in the browser"
       - "Wire SSR-safe inference into a Next.js client component"
@@ -883,8 +908,8 @@ gaps:
     context: "Resolved: maintainer confirms per-class instances. See failure mode 'Single tracker instance for multi-class detectors'."
     status: "resolved"
   - skill: "set-up-onnx-runtime"
-    question: "Web Worker support story — pure modules vs DOM-dependent `source`."
-    context: "Resolved (deferred): no dedicated worker skill in this pass. Worker compatibility noted in the set-up-onnx-runtime skill description. Re-evaluate when the lib ships OffscreenCanvas-based / worker-friendly capturer support."
+    question: "Web Worker support story — pure modules vs the `source` capturers."
+    context: "Resolved (2026-06-12): the re-evaluation trigger fired — commit a11c5d0 added OffscreenCanvas-based capturers, so `source` is now worker-safe and NO subpath is DOM-only. Worker compatibility is documented in the set-up-onnx-runtime skill (updated table) and the handle-frame-coordinates skill (CaptureCanvas + captureStream narrowing). Still no dedicated worker skill; revisit only if worker setup grows complex enough to warrant one."
     status: "resolved"
   - skill: "set-up-detection-pipeline"
     question: "Should unported modules (render / lines) have placeholder skills?"

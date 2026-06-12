@@ -1,3 +1,4 @@
+import { createScratchCanvas2D } from "./canvas";
 import type {
 	Box,
 	CaptureSource,
@@ -123,14 +124,17 @@ function resolveSourceSize(source: CaptureSource): {
  *   underlying canvas and 2D context are created once and reused across calls.
  *
  * @throws {Error} If `inputSize` is not a positive finite number.
- * @throws {Error} If a 2D rendering context cannot be acquired from the
- *   internal canvas (e.g. when running outside a browser-like DOM).
+ * @throws {Error} If a 2D rendering context cannot be acquired, or if neither an
+ *   `OffscreenCanvas` constructor nor a DOM `document` is available (e.g. a bare
+ *   Node process).
  * @throws {Error} From `capture()`: when the source's intrinsic dimensions
  *   are zero or non-finite (e.g. an `HTMLVideoElement` before metadata loads).
  *
  * @remarks
- * Requires a DOM; this function does not work in Node, Web Workers, or SSR
- * contexts. The 2D context is created with `willReadFrequently: true`.
+ * Works on the main thread and inside Web Workers: an `OffscreenCanvas` is used
+ * when its constructor is available (covering both contexts), falling back to a
+ * DOM `<canvas>` via `document.createElement` otherwise. The 2D context is
+ * created with `willReadFrequently: true`.
  *
  * Source dimensions are re-evaluated on every `capture()` call, so this
  * capturer correctly handles a single video element whose resolution changes
@@ -154,15 +158,11 @@ export function createLetterboxCapturer(
 		);
 	}
 
-	const canvas = document.createElement("canvas");
-	canvas.width = inputSize;
-	canvas.height = inputSize;
-	const ctx = canvas.getContext("2d", { willReadFrequently: true });
-	if (!ctx) {
-		throw new Error(
-			"createLetterboxCapturer: failed to acquire a 2D rendering context",
-		);
-	}
+	const { canvas, ctx } = createScratchCanvas2D(
+		inputSize,
+		inputSize,
+		"createLetterboxCapturer",
+	);
 
 	return {
 		canvas,

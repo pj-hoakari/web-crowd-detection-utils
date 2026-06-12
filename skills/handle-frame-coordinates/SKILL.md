@@ -8,7 +8,9 @@ description: >
   resolution changes mid-stream, capture-before-metadata errors, or needs to
   pick a capture strategy. Covers computeLetterboxParams, LetterboxParams
   fields, CaptureSource types (HTMLVideoElement / HTMLImageElement / VideoFrame
-  / OffscreenCanvas), and per-call params re-evaluation.
+  / OffscreenCanvas), the CaptureCanvas return type (capturers run in Web Workers
+  via OffscreenCanvas — narrow capturer.canvas with instanceof before
+  captureStream()), and per-call params re-evaluation.
 type: core
 library: web-crowd-detection-utils
 library_version: "0.0.0"
@@ -16,6 +18,7 @@ sources:
   - "pj-hoakari/web-crowd-detection-utils:src/source/letterbox.ts"
   - "pj-hoakari/web-crowd-detection-utils:src/source/capture.ts"
   - "pj-hoakari/web-crowd-detection-utils:src/source/types.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/source/canvas.ts"
 ---
 
 # Round-trip frame coordinates between source and model space
@@ -86,7 +89,19 @@ const params: LetterboxParams = computeLetterboxParams(1280, 720, 640);
 //   scale: 0.5, padX: 0, padY: 140, contentWidth: 640, contentHeight: 360 }
 ```
 
-Use to map pre-computed boxes (e.g. from a worker that received raw inference output) back to source space without owning a canvas.
+Use to map pre-computed boxes back to source space without owning a canvas — e.g. on the main thread after a worker returned raw inference output. (Since the OffscreenCanvas change the capturers themselves also run in a worker, so the worker can equally own a capturer; this pure function is for the case where it does not.)
+
+### Capturers run in Web Workers (OffscreenCanvas)
+
+```ts
+// Inside a Web Worker — no DOM. createLetterboxCapturer still works: it
+// allocates an OffscreenCanvas when the constructor exists, falling back to
+// document.createElement only on the main thread.
+const capturer = createLetterboxCapturer({ inputSize: 640 });
+const { imageData, params } = capturer.capture(videoFrame); // VideoFrame is a valid CaptureSource
+```
+
+`capturer.canvas` is typed `CaptureCanvas` (`HTMLCanvasElement | OffscreenCanvas`). It is an `OffscreenCanvas` in a worker (or on any thread where the constructor exists) and an `HTMLCanvasElement` only on the DOM fallback. Treat it as the union — see the `captureStream()` mistake below.
 
 ## Common Mistakes
 
@@ -181,6 +196,32 @@ const capturer = createLetterboxCapturer({ inputSize: 640 });
 Stretch fits the source non-uniformly to `width × height`. For non-square sources this distorts boxes proportionally to source aspect ratio and noticeably degrades detection recall.
 
 Source: src/source/capture.ts:14-17 (@remarks 'stretched'), src/source/types.ts:12-15
+
+### HIGH Calling captureStream() on capturer.canvas without narrowing
+
+Wrong:
+
+```ts
+const capturer = createLetterboxCapturer({ inputSize: 640 });
+// capturer.canvas is CaptureCanvas; captureStream() exists only on HTMLCanvasElement
+const stream = capturer.canvas.captureStream(); // TS error; throws whenever the canvas is an OffscreenCanvas
+```
+
+Correct:
+
+```ts
+const { canvas } = capturer;
+if (canvas instanceof HTMLCanvasElement) {
+  const stream = canvas.captureStream();
+  // ...
+} else {
+  // OffscreenCanvas (worker / any thread with the constructor): captureStream() is unavailable here
+}
+```
+
+Since the OffscreenCanvas change, `capturer.canvas` is `HTMLCanvasElement | OffscreenCanvas`. `OffscreenCanvas` has no `captureStream()`, so an unguarded call fails to type-check and throws at runtime whenever the capturer took the OffscreenCanvas path (always, inside a Worker). The capturer's own TSDoc instructs callers to narrow with `instanceof` first.
+
+Source: src/source/types.ts:49-58, 137-148 (@remarks narrow with instanceof), src/source/canvas.ts:47-82
 
 ### HIGH Tension: letterbox correctness vs stretch simplicity
 
