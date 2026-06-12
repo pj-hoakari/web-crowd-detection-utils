@@ -96,4 +96,47 @@ describe("createCanvasFrameCapturer", () => {
 			/2D rendering context/,
 		);
 	});
+
+	it("uses an OffscreenCanvas when available (worker-compatible)", () => {
+		// Simulate a Web Worker: OffscreenCanvas present (it is absent in the
+		// happy-dom test env by default), preferred over the DOM canvas.
+		const ctx = {
+			drawImage: vi.fn(),
+			getImageData: vi.fn(
+				(_x: number, _y: number, w: number, h: number) =>
+					({
+						data: new Uint8ClampedArray(w * h * 4),
+						width: w,
+						height: h,
+						colorSpace: "srgb",
+					}) as unknown as ImageData,
+			),
+		};
+		const getContext = vi.fn(() => ctx);
+		class MockOffscreenCanvas {
+			width: number;
+			height: number;
+			getContext = getContext;
+			constructor(w: number, h: number) {
+				this.width = w;
+				this.height = h;
+			}
+		}
+		vi.stubGlobal("OffscreenCanvas", MockOffscreenCanvas);
+		try {
+			const cap = createCanvasFrameCapturer({ width: 64, height: 48 });
+
+			expect(cap.canvas).toBeInstanceOf(MockOffscreenCanvas);
+			expect(getContext).toHaveBeenCalledWith("2d", {
+				willReadFrequently: true,
+			});
+
+			const out = cap.capture({} as unknown as CanvasImageSource);
+			expect(ctx.drawImage).toHaveBeenCalledTimes(1);
+			expect(out.width).toBe(64);
+			expect(out.height).toBe(48);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
 });

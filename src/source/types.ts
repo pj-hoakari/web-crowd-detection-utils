@@ -6,6 +6,17 @@
 export type CaptureSource = CanvasImageSource;
 
 /**
+ * The off-screen scratch canvas a capturer owns. It is an `OffscreenCanvas`
+ * when that constructor is available (including inside Web Workers, where the
+ * DOM is absent) and a DOM `HTMLCanvasElement` otherwise.
+ *
+ * Consumers that need a concrete type — e.g. to call `captureStream()`, which
+ * only exists on `HTMLCanvasElement` — should narrow with `instanceof` before
+ * use.
+ */
+export type CaptureCanvas = HTMLCanvasElement | OffscreenCanvas;
+
+/**
  * Options for {@link CanvasFrameCapturer} creation.
  *
  * The captured frame is **stretched** (non-aspect-preserving) to the specified
@@ -38,11 +49,13 @@ export interface CanvasFrameCapturer {
 	/** The target output height. */
 	readonly height: number;
 	/**
-	 * The internal off-screen canvas. Exposed for debugging or for callers that
-	 * need to bind the canvas to a `MediaStream` or transfer it to a worker.
-	 * Mutating the canvas externally is not supported.
+	 * The internal off-screen canvas — an `OffscreenCanvas` in worker-like
+	 * contexts, otherwise an `HTMLCanvasElement`. Exposed for debugging,
+	 * transferring to a worker, or (when it is an `HTMLCanvasElement`) binding to
+	 * a `MediaStream` via `captureStream()`. Mutating the canvas externally is not
+	 * supported.
 	 */
-	readonly canvas: HTMLCanvasElement;
+	readonly canvas: CaptureCanvas;
 }
 
 /**
@@ -126,9 +139,11 @@ export interface LetterboxCapturer {
 	/** The square edge length of the output canvas. */
 	readonly inputSize: number;
 	/**
-	 * The internal off-screen canvas. Exposed for debugging or for callers that
-	 * need to bind the canvas to a `MediaStream` or transfer it to a worker.
-	 * Mutating the canvas externally is not supported.
+	 * The internal off-screen canvas — an `OffscreenCanvas` in worker-like
+	 * contexts, otherwise an `HTMLCanvasElement`. Exposed for debugging,
+	 * transferring to a worker, or (when it is an `HTMLCanvasElement`) binding to
+	 * a `MediaStream` via `captureStream()`. Mutating the canvas externally is not
+	 * supported.
 	 */
-	readonly canvas: HTMLCanvasElement;
+	readonly canvas: CaptureCanvas;
 }
