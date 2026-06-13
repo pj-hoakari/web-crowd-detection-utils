@@ -1,3 +1,4 @@
 packages:
   - "."
   - "example/*"
+minimumReleaseAge: 1440
