@@ -15,6 +15,12 @@
 #   added the CaptureCanvas covers entry + captureStream-narrowing failure mode to
 #   handle-frame-coordinates, and resolved the worker-support gap. Library still
 #   at 0.0.0 (package.json unchanged), so version fields are unchanged.
+# Revision: 2026-06-15 diff-audit pass — reconciled with the WASM-asset bridge
+#   (commits 66d81cc, 19e3cac): added the wasmPaths InitSessionOptions override and
+#   the wcdu-copy-runtime-assets CLI for self-hosting the ORT runtime. Added 3
+#   failure modes + covers/tasks to set-up-onnx-runtime (one cross-tagged to
+#   set-up-detection-pipeline) and a self-host-vs-zero-config tension. Library still
+#   at 0.0.0 (package.json unchanged), so version fields are unchanged.
 
 library:
   name: "@pj-hoakari/web-crowd-detection-utils"
@@ -486,11 +492,14 @@ skills:
       - "isWebGpuAvailable"
       - "createPreprocessor / createPreprocessBuffer / rgbaToFloat32Chw"
       - "InitSessionOptions (graphOptimizationLevel, sessionOptions, omitted executionProviders)"
+      - "wasmPaths (InitSessionOptions runtime-asset location override; also via createYoloDetector session option) — assigns the process-global ort.env.wasm.wasmPaths"
+      - "wcdu-copy-runtime-assets CLI (self-host the ORT WASM runtime assets, version-matched to the installed onnxruntime-web)"
       - "Preprocessor ownership / buffer overwrite semantics"
       - "Worker compatibility: all subpaths run in a worker (source via OffscreenCanvas); only consumer-side captureStream() needs the main thread / instanceof narrowing"
     tasks:
       - "Run a non-YOLO segmentation or pose model in the browser"
       - "Wire SSR-safe inference into a Next.js client component"
+      - "Self-host the ORT WASM assets for Next.js standalone / Turbopack via wasmPaths"
       - "Share a single preprocess buffer between detector and another consumer"
       - "Override graphOptimizationLevel for a slow model"
     failure_modes:
@@ -598,6 +607,52 @@ skills:
           await initSession(path, { executionProvider: "wasm" });
         source: "src/onnx/types.ts:38-45 (Omit is intentional), src/onnx/session.ts:44-48"
         priority: "HIGH"
+        status: "active"
+      - mistake: "Default WASM asset resolution breaks under Next.js standalone / Turbopack"
+        mechanism: "onnxruntime-web fetches ort-wasm-simd-threaded.asyncify.wasm over HTTP, resolving it relative to its own module URL by default. Bundlers that don't emit node_modules assets (Next.js output:'standalone', Turbopack) never serve the file, so the first session create / run fails with an opaque WASM instantiate error — not a build-time failure."
+        wrong_pattern: |
+          // No wasmPaths — relies on the bundler serving ort-wasm-*.wasm from node_modules
+          const { session } = await initSession(modelPath, { executionProvider: "webgpu" });
+        correct_pattern: |
+          // Copy the assets (npx wcdu-copy-runtime-assets public/onnxruntime) and point at them
+          const { session } = await initSession(modelPath, {
+            executionProvider: "webgpu",
+            wasmPaths: "/onnxruntime/",
+          });
+        source: "src/onnx/types.ts:47-69 (wasmPaths @remarks), src/bin/copy-runtime-assets.ts, README.md (Serving the ONNX Runtime WebAssembly assets)"
+        priority: "HIGH"
+        status: "active"
+        version_context: "wasmPaths option added 2026-06-15 (commit 66d81cc); the wcdu-copy-runtime-assets CLI in commit 19e3cac. Agents predating these omit the step or self-host via ad-hoc copies."
+        skills: ["set-up-onnx-runtime", "set-up-detection-pipeline"]
+      - mistake: "Self-hosting ORT assets from a mismatched onnxruntime-web version"
+        mechanism: "The JS glue this package bundles expects the exact matching ORT WASM build. Hand-copying ort-wasm-*.wasm from another version, or pinning a CDN to the wrong version, makes ONNX Runtime fail to initialize. wcdu-copy-runtime-assets avoids this — it resolves the assets from the onnxruntime-web this package depends on, so the served runtime always matches the glue."
+        wrong_pattern: |
+          initSession(modelPath, {
+            executionProvider: "wasm",
+            wasmPaths: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.0/dist/", // wrong version
+          });
+        correct_pattern: |
+          // npx wcdu-copy-runtime-assets public/onnxruntime  (version resolved from the installed dep)
+          initSession(modelPath, { executionProvider: "wasm", wasmPaths: "/onnxruntime/" });
+        source: "src/bin/copy-runtime-assets.ts:25-49 (resolves from installed onnxruntime-web), package.json#dependencies (onnxruntime-web owned)"
+        priority: "HIGH"
+        status: "active"
+      - mistake: "Expecting a later wasmPaths to override an already-initialized runtime"
+        mechanism: "wasmPaths assigns ort.env.wasm.wasmPaths, a process-global singleton shared by every session on the page. The value in effect when the FIRST session is created wins; setting it on a later session (or after the first) does not move already-loaded assets, so the override silently has no effect."
+        wrong_pattern: |
+          const a = await initSession(modelA, { executionProvider: "webgpu" }); // resolves here
+          const b = await initSession(modelB, {
+            executionProvider: "webgpu",
+            wasmPaths: "/onnxruntime/", // too late — global already used
+          });
+        correct_pattern: |
+          const a = await initSession(modelA, {
+            executionProvider: "webgpu",
+            wasmPaths: "/onnxruntime/", // set on the first session
+          });
+          const b = await initSession(modelB, { executionProvider: "webgpu" }); // inherits the global
+        source: "src/onnx/types.ts:63-67 (@remarks process-global singleton), src/onnx/session.ts:49-51"
+        priority: "MEDIUM"
         status: "active"
 
   - name: "Suppress static false positives with the background model"
@@ -850,6 +905,11 @@ tensions:
     skills: ["count-line-crossings", "integrate-tracking"]
     description: "Accurate per-line crossing counts depend on a single stable trackId persisting across the line; tracker tuning that is fine for live counts (short trackBuffer, strict newTrackThresh) increases ID switches exactly at the line."
     implication: "An agent tunes the tracker for one goal (e.g. fewer ghost tracks) and silently degrades crossing accuracy; crossing-assist mitigates but cannot fully recover a lost ID."
+
+  - name: "Zero-config asset resolution vs reliable self-hosting"
+    skills: ["set-up-onnx-runtime", "set-up-detection-pipeline"]
+    description: "Omitting wasmPaths lets ONNX Runtime resolve its WASM assets automatically (zero config), but that resolution depends on the bundler serving node_modules assets; self-hosting via wcdu-copy-runtime-assets + wasmPaths is reliable but adds a copy step and a served path to keep in sync."
+    implication: "An agent leaves wasmPaths unset because it 'works' under a dev / webpack setup, then the same code 404s the .wasm at first inference under Next.js standalone / Turbopack — an opaque runtime failure with no build-time signal."
 
 cross_references:
   - from: "set-up-detection-pipeline"

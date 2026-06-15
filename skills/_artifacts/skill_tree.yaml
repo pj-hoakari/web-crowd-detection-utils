@@ -10,6 +10,11 @@
 #   Worker change (commit a11c5d0). No new skills; updated handle-frame-coordinates
 #   (CaptureCanvas + worker compatibility, added src/source/canvas.ts source) and
 #   set-up-onnx-runtime (worker-compatibility description). Still flat/no-router.
+# Revision: 2026-06-15 diff-audit pass — reconciled with the WASM-asset bridge
+#   (commits 66d81cc, 19e3cac). No new skills; updated set-up-onnx-runtime
+#   (wasmPaths self-hosting + wcdu-copy-runtime-assets CLI, added
+#   src/bin/copy-runtime-assets.ts source) and set-up-detection-pipeline
+#   (session.wasmPaths pass-through). Still flat/no-router.
 library:
   name: "@pj-hoakari/web-crowd-detection-utils"
   version: "0.0.0"
@@ -30,7 +35,9 @@ skills:
       First-pass YOLO detection: wire createYoloDetector + createLetterboxCapturer +
       reverseLetterboxBoxes to turn a video/image into Detection[] in source space.
       Covers executionProvider (webgpu/wasm) choice with manual fallback,
-      SSR-safe initialization, preprocessBuffer ownership, inputSize sizing.
+      SSR-safe initialization, preprocessBuffer ownership, inputSize sizing, and
+      session.wasmPaths pass-through to self-host ORT WASM assets for production
+      bundlers (see set-up-onnx-runtime for the CLI + failure modes).
     sources:
       - "pj-hoakari/web-crowd-detection-utils:src/yolo/detector.ts"
       - "pj-hoakari/web-crowd-detection-utils:src/yolo/index.ts"
@@ -109,7 +116,9 @@ skills:
       Use the onnx subpath (initSession, createPreprocessor, rgbaToFloat32Chw,
       isWebGpuAvailable) directly for non-YOLO ONNX models. Covers WebGPU/WASM
       provider selection, SSR-safe dynamic import, InitSessionOptions and the
-      omitted executionProviders field, Preprocessor buffer ownership/overwrite,
+      omitted executionProviders field, the wasmPaths runtime-asset override +
+      self-hosting the ORT WASM assets via the wcdu-copy-runtime-assets CLI (for
+      Next.js standalone / Turbopack), Preprocessor buffer ownership/overwrite,
       the lib-owns-onnxruntime-web contract (never bypass to call ort directly),
       and Worker compatibility (all subpaths run in a worker; source uses
       OffscreenCanvas; only consumer-side captureStream() needs the main thread).
@@ -118,6 +127,7 @@ skills:
       - "pj-hoakari/web-crowd-detection-utils:src/onnx/preprocess.ts"
       - "pj-hoakari/web-crowd-detection-utils:src/onnx/backend.ts"
       - "pj-hoakari/web-crowd-detection-utils:src/onnx/types.ts"
+      - "pj-hoakari/web-crowd-detection-utils:src/bin/copy-runtime-assets.ts"
       - "pj-hoakari/web-crowd-detection-utils:CLAUDE.md"
 
   - name: "suppress-static-detections"
