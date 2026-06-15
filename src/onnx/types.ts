@@ -27,6 +27,16 @@ export type GraphOptimizationLevel = NonNullable<
 >;
 
 /**
+ * Location override for ONNX Runtime Web's WebAssembly runtime assets
+ * (`ort-wasm-*.wasm` / `.mjs`), as accepted by `ort.env.wasm.wasmPaths`.
+ *
+ * Either a single base path or URL prefix the asset files are served under
+ * (e.g. `"/onnxruntime/"`), or a per-file map (`{ wasm, mjs }`) for explicit
+ * control. Mirrors ONNX Runtime's own `wasmPaths` type.
+ */
+export type WasmPaths = ort.Env.WasmPrefixOrFilePaths;
+
+/**
  * Options for initializing an ONNX Runtime session.
  */
 export interface InitSessionOptions {
@@ -34,6 +44,29 @@ export interface InitSessionOptions {
 	executionProvider: ExecutionProvider;
 	/** Graph optimization level. Defaults to `"all"` when omitted. */
 	graphOptimizationLevel?: GraphOptimizationLevel;
+	/**
+	 * Where ONNX Runtime Web loads its WebAssembly runtime assets
+	 * (`ort-wasm-simd-threaded.asyncify.{wasm,mjs}`) from. When provided, it is
+	 * assigned to `ort.env.wasm.wasmPaths` before the session is created, so the
+	 * runtime fetches the assets from a location you serve rather than the
+	 * bundler default.
+	 *
+	 * Self-hosting the assets and pointing this at them is the reliable way to
+	 * ship the runtime. By default ONNX Runtime resolves the files relative to
+	 * its own module URL (`import.meta.url`), which only works when the host
+	 * bundler emits and serves them — not guaranteed under every setup (e.g.
+	 * Next.js `output: "standalone"`, where `_next/static` assets coming from
+	 * `node_modules` are not copied into the standalone server). Point this at a
+	 * static path such as `"/onnxruntime/"` that serves the asset file to avoid
+	 * relying on that resolution.
+	 *
+	 * **Side effect:** assigning `ort.env.wasm.wasmPaths` mutates a process-global
+	 * singleton shared by every session in the page. When multiple sessions are
+	 * created with different values, the value set immediately before the first
+	 * session is created wins; later assignments do not move already-loaded
+	 * runtime assets. When omitted, the global is left untouched.
+	 */
+	wasmPaths?: WasmPaths;
 	/**
 	 * Additional `InferenceSession.SessionOptions` to merge in.
 	 * `executionProviders` is intentionally omitted — it is set from

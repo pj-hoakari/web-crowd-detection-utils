@@ -21,6 +21,11 @@ import type { InitSessionOptions, SessionResult } from "./types";
  * the cost of fetching and evaluating the runtime bundle (including WASM assets), which
  * can take hundreds of milliseconds to several seconds depending on network and device.
  * Any side effects of importing `onnxruntime-web` (such as logging) also occur at that time.
+ *
+ * When `options.wasmPaths` is provided, it is assigned to `ort.env.wasm.wasmPaths`
+ * immediately after the runtime is imported and before the session is created, so the
+ * runtime resolves its WebAssembly assets from the given location. This mutates a
+ * process-global singleton — see {@link InitSessionOptions.wasmPaths}.
  */
 export async function initSession(
 	modelPath: string | ArrayBufferLike | Uint8Array,
@@ -29,6 +34,7 @@ export async function initSession(
 	const {
 		executionProvider,
 		graphOptimizationLevel = "all",
+		wasmPaths,
 		sessionOptions,
 	} = options;
 
@@ -39,6 +45,11 @@ export async function initSession(
 	}
 
 	const ortRuntime = await import("onnxruntime-web/webgpu");
+
+	if (wasmPaths !== undefined) {
+		ortRuntime.env.wasm.wasmPaths = wasmPaths;
+	}
+
 	const session = await ortRuntime.InferenceSession.create(
 		modelPath as Parameters<typeof ort.InferenceSession.create>[0],
 		{
