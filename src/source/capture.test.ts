@@ -42,10 +42,15 @@ describe("createCanvasFrameCapturer", () => {
 	let stub: ReturnType<typeof stubCanvasContext>;
 
 	beforeEach(() => {
+		// happy-dom ≥20.10 exposes an OffscreenCanvas global whose 2D context is
+		// unimplemented; force it absent so the DOM-canvas branch is exercised.
+		// The worker-compatible test below re-stubs it with a working mock.
+		vi.stubGlobal("OffscreenCanvas", undefined);
 		stub = stubCanvasContext();
 	});
 	afterEach(() => {
 		stub.restore();
+		vi.unstubAllGlobals();
 	});
 
 	it("propagates width/height to the internal canvas and metadata", () => {
@@ -98,8 +103,8 @@ describe("createCanvasFrameCapturer", () => {
 	});
 
 	it("uses an OffscreenCanvas when available (worker-compatible)", () => {
-		// Simulate a Web Worker: OffscreenCanvas present (it is absent in the
-		// happy-dom test env by default), preferred over the DOM canvas.
+		// Simulate a Web Worker: OffscreenCanvas present (forced absent in
+		// beforeEach), preferred over the DOM canvas.
 		const ctx = {
 			drawImage: vi.fn(),
 			getImageData: vi.fn(

@@ -22,8 +22,9 @@ function makeStubContext(): StubContext {
 }
 
 /**
- * Installs a mock `OffscreenCanvas` global (absent in the happy-dom test env)
- * whose `getContext` returns `ctx`. Removed by `vi.unstubAllGlobals()`.
+ * Installs a mock `OffscreenCanvas` global whose `getContext` returns `ctx`,
+ * overriding happy-dom's own (whose 2D context is unimplemented). Removed by
+ * `vi.unstubAllGlobals()`.
  */
 function stubOffscreenCanvas(ctx: unknown): {
 	getContext: ReturnType<typeof vi.fn>;
@@ -86,9 +87,9 @@ describe("createScratchCanvas2D", () => {
 	});
 
 	it("falls back to a DOM canvas when OffscreenCanvas is unavailable", () => {
-		expect(
-			typeof (globalThis as { OffscreenCanvas?: unknown }).OffscreenCanvas,
-		).toBe("undefined");
+		// happy-dom ≥20.10 exposes an OffscreenCanvas global whose 2D context is
+		// unimplemented; force it absent so the DOM-canvas branch is exercised.
+		vi.stubGlobal("OffscreenCanvas", undefined);
 
 		const ctx = makeStubContext();
 		const stub = stubHtmlCanvasContext(ctx);
