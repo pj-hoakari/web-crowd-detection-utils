@@ -17,11 +17,11 @@
 
 | Skill                          | Type | Domain                | What it covers                                                                                                | Failure modes |
 | ------------------------------ | ---- | --------------------- | ------------------------------------------------------------------------------------------------------------- | ------------- |
-| set-up-detection-pipeline      | core | detection-pipeline    | `createYoloDetector` + capturer + reverse transform — happy-path wiring, backend choice                       | 5             |
+| set-up-detection-pipeline      | core | detection-pipeline    | `createYoloDetector` + capturer + reverse transform — happy-path wiring, backend choice, `session.wasmPaths` pass-through | 5             |
 | configure-yolo-postprocess     | core | detection-pipeline    | `OutputFormat`, `postprocess`, `nms`, defaults, sigmoid auto-detection, `auto` heuristic limits               | 5             |
 | handle-frame-coordinates       | core | frame-acquisition     | `createLetterboxCapturer` ↔ `reverseLetterboxBox` pair, stretch pair, `computeLetterboxParams`, `CaptureCanvas` (worker / OffscreenCanvas, narrow for `captureStream()`) | 5             |
 | integrate-tracking             | core | multi-object-tracking | `BYTETracker`, stateful lifecycle, `Observation` / `Detection` compat, threshold roles, per-class pattern     | 7             |
-| set-up-onnx-runtime            | core | runtime-setup         | `initSession`, `isWebGpuAvailable`, `createPreprocessor`, SSR safety, owned `onnxruntime-web`, Worker compatibility (all subpaths run in a worker; source via OffscreenCanvas) | 6             |
+| set-up-onnx-runtime            | core | runtime-setup         | `initSession`, `isWebGpuAvailable`, `createPreprocessor`, SSR safety, owned `onnxruntime-web`, `wasmPaths` self-hosting (`wcdu-copy-runtime-assets` CLI), Worker compatibility (all subpaths run in a worker; source via OffscreenCanvas) | 9             |
 | suppress-static-detections     | core | static-suppression    | `BackgroundSubtractor`, model-space `suppressStatic` (score attenuation, not removal), warm-up/`reset()`, tuning | 6             |
 | count-line-crossings           | core | line-crossing-counting | `LineCrossingCounter`, caller-anchored `{trackId,point}` + `Line{p1,p2}`, side+segment crossing test, crossing-assist (rescue/cooldown) | 6             |
 
@@ -69,16 +69,19 @@
 | 6   | Redundant Detection → Observation remapping                | HIGH     | src/yolo/types.ts:9-15 (compat note), src/bytetrack/tracker.ts:125-135 (pass-through)      | —                         |
 | 7   | Single tracker instance for multi-class detectors          | HIGH     | src/bytetrack/association.ts:30-39 (no classId), maintainer interview                      | —                         |
 
-### set-up-onnx-runtime (6 failure modes)
+### set-up-onnx-runtime (9 failure modes)
 
-| #   | Mistake                                                       | Priority | Source                                                       | Cross-skill? |
-| --- | ------------------------------------------------------------- | -------- | ------------------------------------------------------------ | ------------ |
-| 1   | Bypassing the library to call onnxruntime-web directly        | CRITICAL | src/onnx/session.ts (entry point), CLAUDE.md (design intent) | —            |
-| 2   | Adding onnxruntime-web to consumer package.json               | HIGH     | CLAUDE.md, package.json#dependencies                         | —            |
-| 3   | Importing onnxruntime-web at module top level                 | HIGH     | src/onnx/session.ts:17-23                                    | —            |
-| 4   | Trusting isWebGpuAvailable() as a 'safe to run' check         | HIGH     | src/onnx/backend.ts:8-12                                     | —            |
-| 5   | Forgetting Preprocessor buffer overwrite semantics            | HIGH     | src/onnx/preprocess.ts:96-110                                | —            |
-| 6   | Forcing executionProviders via sessionOptions with `as any`   | HIGH     | src/onnx/types.ts:38-45                                      | —            |
+| #   | Mistake                                                       | Priority | Source                                                       | Cross-skill?              |
+| --- | ------------------------------------------------------------- | -------- | ------------------------------------------------------------ | ------------------------- |
+| 1   | Bypassing the library to call onnxruntime-web directly        | CRITICAL | src/onnx/session.ts (entry point), CLAUDE.md (design intent) | —                         |
+| 2   | Adding onnxruntime-web to consumer package.json               | HIGH     | CLAUDE.md, package.json#dependencies                         | —                         |
+| 3   | Importing onnxruntime-web at module top level                 | HIGH     | src/onnx/session.ts:17-23                                    | —                         |
+| 4   | Trusting isWebGpuAvailable() as a 'safe to run' check         | HIGH     | src/onnx/backend.ts:8-12                                     | —                         |
+| 5   | Forgetting Preprocessor buffer overwrite semantics            | HIGH     | src/onnx/preprocess.ts:96-110                                | —                         |
+| 6   | Forcing executionProviders via sessionOptions with `as any`   | HIGH     | src/onnx/types.ts:38-45                                      | —                         |
+| 7   | Default WASM asset resolution breaks under Next.js standalone / Turbopack | HIGH | src/onnx/types.ts:47-69, src/bin/copy-runtime-assets.ts, README.md | set-up-detection-pipeline |
+| 8   | Self-hosting ORT assets from a mismatched onnxruntime-web version | HIGH | src/bin/copy-runtime-assets.ts:25-49, package.json#dependencies | —                         |
+| 9   | Expecting a later wasmPaths to override an initialized runtime | MEDIUM   | src/onnx/types.ts:63-67, src/onnx/session.ts:49-51           | —                         |
 
 ### suppress-static-detections (6 failure modes)
 
@@ -112,6 +115,7 @@
 | Letterbox correctness vs stretch simplicity        | handle-frame-coordinates ↔ set-up-detection-pipeline    | Agent picks stretch for code brevity; recall drops on 16:9 sources, no error fires, behavior just looks worse than the example.  |
 | Static suppression vs stationary-crowd recall      | suppress-static-detections ↔ integrate-tracking         | Agent enables suppressStatic to kill poster/mannequin false positives; people who stand still merge into the EMA background and are silently dropped. |
 | Crossing accuracy vs tracker ID stability          | count-line-crossings ↔ integrate-tracking               | Agent tunes the tracker for one goal (fewer ghost tracks) and silently degrades crossing counts via ID switches at the line; assist mitigates but cannot fully recover a lost ID. |
+| Zero-config asset resolution vs reliable self-hosting | set-up-onnx-runtime ↔ set-up-detection-pipeline      | Agent leaves `wasmPaths` unset because it works under dev/webpack, then the same code 404s the `.wasm` at first inference under Next.js standalone / Turbopack — opaque, no build-time signal. |
 
 ## Cross-References
 
@@ -141,7 +145,7 @@
 | configure-yolo-postprocess | OutputFormat variants (end-to-end, end-to-end-transposed, standard, standard-transposed, auto)                      | OutputFormat dispatch table: per-format expected tensor dims, sigmoid heuristic, `dispatchAuto` rules + known-edge-shape caveats                            |
 | handle-frame-coordinates   | Letterbox capturer + reverse pair, Canvas/stretch capturer + reverse pair                                           | LetterboxParams field reference and transform algebra                                                                                                      |
 | integrate-tracking         | —                                                                                                                   | BYTETrackerOptions threshold cheat-sheet (highThresh, matchThresh, secondMatchThresh, unconfirmedMatchThresh, newTrackThresh, duplicateIouThresh, trackBuffer) |
-| set-up-onnx-runtime        | —                                                                                                                   | InitSessionOptions field reference (graphOptimizationLevel, sessionOptions Omit); subpath Worker compatibility table (all subpaths run in a worker; source via OffscreenCanvas; only consumer-side captureStream() needs the main thread) |
+| set-up-onnx-runtime        | —                                                                                                                   | InitSessionOptions field reference (graphOptimizationLevel, sessionOptions Omit, wasmPaths self-hosting); subpath Worker compatibility table (all subpaths run in a worker; source via OffscreenCanvas; only consumer-side captureStream() needs the main thread) |
 | suppress-static-detections | —                                                                                                                   | — (5-option config surface; no dense API or independent subsystems — no references/ file needed)                                                          |
 | count-line-crossings       | —                                                                                                                   | — (single counter + 3-field assist config; no dense API or independent subsystems — no references/ file needed)                                            |
 
@@ -151,12 +155,12 @@
 - **Framework skills:** none — package is framework-agnostic; React appears only in example apps
 - **Lifecycle skills:** none in this pass — go-to-production / migration guides don't yet exist for this library
 - **Composition skills:** none — examples use React + Vite but the integration is generic enough that pulling it into a dedicated skill would be premature
-- **Reference files:** `configure-yolo-postprocess` (OutputFormat reference), `integrate-tracking` (BYTETrackerOptions reference), `set-up-onnx-runtime` (InitSessionOptions reference + subpath worker-compatibility table — all subpaths worker-capable, source via OffscreenCanvas)
+- **Reference files:** `configure-yolo-postprocess` (OutputFormat reference), `integrate-tracking` (BYTETrackerOptions reference), `set-up-onnx-runtime` (InitSessionOptions reference incl. `wasmPaths` self-hosting + subpath worker-compatibility table — all subpaths worker-capable, source via OffscreenCanvas)
 
 ## Composition Opportunities
 
 | Library          | Integration points                                                                                                 | Composition skill needed?                                                                                 |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| onnxruntime-web  | Owned dependency; consumers must not redeclare. `initSession` returns the raw `InferenceSession` for advanced use. | No — handled inside `set-up-onnx-runtime`. The CRITICAL "bypass" failure mode covers the boundary.        |
+| onnxruntime-web  | Owned dependency; consumers must not redeclare. `initSession` returns the raw `InferenceSession`; `wasmPaths` + the `wcdu-copy-runtime-assets` CLI self-host the WASM runtime (version-matched). | No — handled inside `set-up-onnx-runtime`. The "bypass" and WASM-asset self-hosting failure modes cover the boundary. |
 | React + Vite     | Both example apps use them; pattern is `useRef` for video/canvas + `useEffect` lifecycle around AbortController.   | No (this pass) — pattern is generic browser-app glue, not specific to this library's surface.             |
 | Ultralytics CLI  | Model export step (`yolo export ... format=onnx`) is a prerequisite for using `createYoloDetector`.                | Maybe — `prepare-yolo-onnx-model` skill (export + place in /public) would unblock first-time consumers.   |

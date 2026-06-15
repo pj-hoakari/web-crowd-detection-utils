@@ -28,6 +28,9 @@
 		"LICENSE",
 		"skills"
 	],
+	"bin": {
+		"wcdu-copy-runtime-assets": "./dist/bin/copy-runtime-assets.js"
+	},
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",

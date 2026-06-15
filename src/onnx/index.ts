@@ -12,4 +12,5 @@ export type {
 	PreprocessOptions,
 	Preprocessor,
 	SessionResult,
+	WasmPaths,
 } from "./types";

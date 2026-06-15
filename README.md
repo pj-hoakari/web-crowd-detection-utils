@@ -13,6 +13,43 @@ Browser-targeted TypeScript building blocks for in-browser YOLO + ByteTrack crow
 | `@pj-hoakari/web-crowd-detection-utils/background` | Detector-agnostic `BackgroundSubtractor` for static-detection suppression |
 | `@pj-hoakari/web-crowd-detection-utils/line-crossing` | Detector-agnostic `LineCrossingCounter`: count tracked points crossing anchor-defined lines |
 
+## Serving the ONNX Runtime WebAssembly assets
+
+`onnxruntime-web` loads a WebAssembly runtime (`ort-wasm-simd-threaded.asyncify.wasm` + `.mjs`) at inference time. The `.wasm` is **not** inlined into JavaScript — the browser fetches it over HTTP — so a host application must serve it. By default ONNX Runtime resolves it relative to its own bundle URL (`import.meta.url`), which is unreliable with some setups (e.g. Next.js `output: "standalone"` or Turbopack, which does not emit/serve the file from `node_modules`).
+
+This package gives you two pieces to self-host the runtime reliably:
+
+1. A `wcdu-copy-runtime-assets` CLI that copies the exact assets this package needs (resolved from the installed `onnxruntime-web`, so versions always match) into a directory you serve:
+
+   ```sh
+   # copies into ./public/onnxruntime by default; pass a path to override
+   wcdu-copy-runtime-assets public/onnxruntime
+   ```
+
+   It is bundler-agnostic (works under Turbopack, webpack, Vite). Wire it into your install / build scripts so the assets stay in sync:
+
+   ```jsonc
+   // package.json
+   {
+     "scripts": {
+       "postinstall": "wcdu-copy-runtime-assets public/onnxruntime",
+       "prebuild": "wcdu-copy-runtime-assets public/onnxruntime"
+     }
+   }
+   ```
+
+2. A `wasmPaths` option on `initSession` / `createYoloDetector` that points ONNX Runtime at the served path:
+
+   ```ts
+   const detector = await createYoloDetector({
+     modelPath: "/models/yolo26n.onnx",
+     executionProvider: "webgpu",
+     session: { wasmPaths: "/onnxruntime/" }, // matches the copy destination
+   });
+   ```
+
+Alternatively, set `wasmPaths` to a version-pinned CDN (`https://cdn.jsdelivr.net/npm/onnxruntime-web@<version>/dist/`) and skip the copy step — at the cost of an external runtime dependency.
+
 ## AI coding agents
 
 This package ships agent skills under `skills/`. If you use an AI coding agent (Claude Code, Cursor, Copilot, etc.), run:
