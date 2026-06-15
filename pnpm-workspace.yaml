@@ -1,4 +1,7 @@
 packages:
   - "."
   - "example/*"
+allowBuilds:
+  esbuild: true
+  protobufjs: true
 minimumReleaseAge: 1440
