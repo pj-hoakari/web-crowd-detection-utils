@@ -136,6 +136,23 @@ try {
 
 `initSession` never silently falls back. `isWebGpuAvailable()` checks for `navigator.gpu` presence but the GPU adapter can still fail at session create — the try/catch is required.
 
+### Self-host the ONNX Runtime WASM assets for production bundlers
+
+```ts
+// Some bundlers (Next.js `output: "standalone"`, Turbopack) don't serve ORT's
+// WASM runtime from node_modules, so the default resolution 404s at first
+// inference. Copy it with the bundled CLI and point the detector's session at
+// the served path:
+//   npx wcdu-copy-runtime-assets public/onnxruntime
+const detector = await createYoloDetector({
+  modelPath,
+  executionProvider: "webgpu",
+  session: { wasmPaths: "/onnxruntime/" }, // forwarded straight to initSession
+});
+```
+
+`createYoloDetector`'s `session` field is `Omit<InitSessionOptions, "executionProvider">`, so `wasmPaths` (and `graphOptimizationLevel`, `sessionOptions`) pass straight through to `initSession`. See `set-up-onnx-runtime/SKILL.md` § Self-host the ONNX Runtime WASM assets for the CLI, the version-match guarantee, and the global-singleton failure modes.
+
 ## Common Mistakes
 
 ### CRITICAL Default format mismatches stock Ultralytics export
@@ -276,5 +293,5 @@ See also: `configure-yolo-postprocess/SKILL.md` § Common Mistakes — `Blind tr
 
 - `handle-frame-coordinates/SKILL.md` — letterbox vs stretch capture and the paired reverse transform
 - `configure-yolo-postprocess/SKILL.md` — tuning OutputFormat, thresholds, NMS, and classFilter when the first-pass yields no detections or a shape error
-- `set-up-onnx-runtime/SKILL.md` — `initSession` and backend selection details when debugging at the runtime layer, plus § Worker compatibility (since the OffscreenCanvas change the whole pipeline, capture included, can run inside a Web Worker)
+- `set-up-onnx-runtime/SKILL.md` — `initSession` and backend selection details when debugging at the runtime layer, § Self-host the ONNX Runtime WASM assets (`wasmPaths` / `wcdu-copy-runtime-assets`) for production bundlers, plus § Worker compatibility (since the OffscreenCanvas change the whole pipeline, capture included, can run inside a Web Worker)
 - `integrate-tracking/SKILL.md` — adding `BYTETracker` on top of detections for stable IDs

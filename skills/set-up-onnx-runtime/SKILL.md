@@ -4,13 +4,16 @@ description: >
   Use the onnx subpath (initSession, createPreprocessor / createPreprocessBuffer
   / rgbaToFloat32Chw, isWebGpuAvailable) directly for non-YOLO ONNX models or
   custom inference pipelines. Load when an agent runs a segmentation/pose/depth
-  model, wires SSR-safe inference into Next.js, picks WebGPU vs WASM, debugs
-  buffer ownership, or is tempted to import onnxruntime-web directly. Covers
-  the lib-owns-onnxruntime-web contract (never bypass), Preprocessor buffer
-  overwrite semantics, InitSessionOptions and the omitted executionProviders
-  field, Worker compatibility (every subpath runs in a Web Worker — the source
-  capturers use OffscreenCanvas — so only consumer-side captureStream() needs the
-  main thread), and dynamic-import SSR safety.
+  model, wires SSR-safe inference into Next.js, picks WebGPU vs WASM, self-hosts
+  the ONNX Runtime WASM assets (wcdu-copy-runtime-assets CLI + the wasmPaths
+  option) for bundlers that don't serve them (Next.js standalone / Turbopack),
+  debugs buffer ownership, or is tempted to import onnxruntime-web directly.
+  Covers the lib-owns-onnxruntime-web contract (never bypass), Preprocessor
+  buffer overwrite semantics, InitSessionOptions and the omitted
+  executionProviders field, the wasmPaths runtime-asset location override (a
+  process-global singleton), Worker compatibility (every subpath runs in a Web
+  Worker — the source capturers use OffscreenCanvas — so only consumer-side
+  captureStream() needs the main thread), and dynamic-import SSR safety.
 type: core
 library: web-crowd-detection-utils
 library_version: "0.0.0"
@@ -19,6 +22,7 @@ sources:
   - "pj-hoakari/web-crowd-detection-utils:src/onnx/preprocess.ts"
   - "pj-hoakari/web-crowd-detection-utils:src/onnx/backend.ts"
   - "pj-hoakari/web-crowd-detection-utils:src/onnx/types.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/bin/copy-runtime-assets.ts"
   - "pj-hoakari/web-crowd-detection-utils:CLAUDE.md"
 ---
 
@@ -111,12 +115,50 @@ export async function loadDetector(modelPath: ArrayBuffer) {
 // In a React component: call from useEffect / onClick, never during SSR render.
 ```
 
+### Self-host the ONNX Runtime WASM assets (reliable production setup)
+
+`onnxruntime-web` fetches a WebAssembly runtime (`ort-wasm-simd-threaded.asyncify.wasm` + `.mjs`) over HTTP at first inference — the `.wasm` is **not** inlined. By default ONNX Runtime resolves those files relative to its own module URL (`import.meta.url`), which only works when the host bundler emits and serves them from `node_modules`. Several setups do **not** (e.g. Next.js `output: "standalone"`, Turbopack). Self-host the assets and point the runtime at them with `wasmPaths`:
+
+```sh
+# 1. Copy the exact assets this package needs into a served directory.
+#    The CLI resolves them from the installed onnxruntime-web, so the served
+#    runtime always matches the JS glue this package bundles.
+npx wcdu-copy-runtime-assets public/onnxruntime
+```
+
+```jsonc
+// package.json — keep the copy in sync on install and build
+{
+  "scripts": {
+    "postinstall": "wcdu-copy-runtime-assets public/onnxruntime",
+    "prebuild": "wcdu-copy-runtime-assets public/onnxruntime"
+  }
+}
+```
+
+```ts
+// 2. Point the runtime at the served path via wasmPaths.
+const { session } = await initSession(modelPath, {
+  executionProvider: "webgpu",
+  wasmPaths: "/onnxruntime/", // matches the copy destination (public/onnxruntime → /onnxruntime/)
+});
+
+// Through the YOLO detector the same option lives under `session`:
+const detector = await createYoloDetector({
+  modelPath,
+  executionProvider: "webgpu",
+  session: { wasmPaths: "/onnxruntime/" },
+});
+```
+
+`wasmPaths` assigns `ort.env.wasm.wasmPaths`, a **process-global singleton** shared by every session on the page. Set it on (or before) the first `initSession` call — the value in effect when the first session is created wins, and later assignments do not move already-loaded assets. Alternatively, pin a CDN at the exact installed version (`https://cdn.jsdelivr.net/npm/onnxruntime-web@<version>/dist/`) and skip the copy step, at the cost of an external runtime dependency.
+
 ### Worker compatibility — every subpath runs in a Web Worker
 
 | Subpath / API                                       | DOM-free | Worker-safe |
 | --------------------------------------------------- | -------- | ----------- |
 | `onnx/preprocess` (`createPreprocessor`, etc.)      | Yes      | Yes         |
-| `onnx/session` (`initSession`)                      | Yes      | Yes (if ORT WASM/WebGPU paths configured in the worker) |
+| `onnx/session` (`initSession`)                      | Yes      | Yes — pass `wasmPaths` so ORT resolves its WASM assets from a path the worker can fetch |
 | `bytetrack` (`BYTETracker`)                         | Yes      | Yes         |
 | `yolo/postprocess` (`postprocess`, `nms`)           | Yes      | Yes         |
 | `source` (`create*Capturer`)                        | Yes — prefers `OffscreenCanvas`, falls back to `document.createElement` | Yes (when the `OffscreenCanvas` constructor exists — covers all workers) |
@@ -281,6 +323,90 @@ await initSession(path, { executionProvider: "wasm" });
 `InitSessionOptions.sessionOptions` is typed as `Omit<..., "executionProviders">` on purpose — the singular field is the sole knob and the library forwards it correctly. `as any` overrides produce confusing "two providers" behavior or silent overrides.
 
 Source: src/onnx/types.ts:38-45 (Omit is intentional), src/onnx/session.ts:44-48
+
+### HIGH Relying on default WASM asset resolution under Next.js standalone / Turbopack
+
+Wrong:
+
+```ts
+// No wasmPaths — ORT resolves ort-wasm-*.wasm relative to its own module URL.
+// Under Next.js `output: "standalone"` or Turbopack the file is never emitted
+// from node_modules, so the first inference fails fetching the .wasm.
+const { session } = await initSession(modelPath, { executionProvider: "webgpu" });
+```
+
+Correct:
+
+```ts
+// Self-host the assets (see § Self-host the ONNX Runtime WASM assets) and point at them.
+const { session } = await initSession(modelPath, {
+  executionProvider: "webgpu",
+  wasmPaths: "/onnxruntime/",
+});
+```
+
+The `.wasm` is fetched over HTTP, not inlined. Default resolution relies on the bundler emitting the file from `node_modules`; standalone/Turbopack builds don't, so it 404s at session create / first `run` with an opaque instantiate error rather than a build-time failure. Copy the assets with `wcdu-copy-runtime-assets` and set `wasmPaths`.
+
+Source: src/onnx/types.ts:47-69 (wasmPaths @remarks), src/bin/copy-runtime-assets.ts, README.md (Serving the ONNX Runtime WebAssembly assets)
+
+### HIGH Self-hosting ORT assets from a mismatched onnxruntime-web version
+
+Wrong:
+
+```ts
+// Hand-copied ort-wasm-*.wasm from a different onnxruntime-web version, or a CDN
+// pinned to the wrong version. The JS glue this package bundles expects the exact
+// matching build — a mismatch makes ONNX Runtime fail to initialize.
+initSession(modelPath, {
+  executionProvider: "wasm",
+  wasmPaths: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.0/dist/",
+});
+```
+
+Correct:
+
+```sh
+# Let the CLI resolve the assets from the onnxruntime-web THIS package depends on,
+# so the served runtime always matches the bundled glue.
+npx wcdu-copy-runtime-assets public/onnxruntime
+```
+
+```ts
+initSession(modelPath, { executionProvider: "wasm", wasmPaths: "/onnxruntime/" });
+```
+
+`wcdu-copy-runtime-assets` copies `ort-wasm-simd-threaded.asyncify.{wasm,mjs}` resolved from the installed `onnxruntime-web` (which this package owns), guaranteeing the runtime matches the glue. A hand-picked file or wrong-version CDN URL throws at session create with a runtime-init error.
+
+Source: src/bin/copy-runtime-assets.ts:25-49 (resolves from installed onnxruntime-web), package.json#dependencies (onnxruntime-web owned)
+
+### MEDIUM Expecting a later wasmPaths to override an already-initialized runtime
+
+Wrong:
+
+```ts
+// First session created without wasmPaths — ORT resolves (and may fail) here.
+const a = await initSession(modelA, { executionProvider: "webgpu" });
+// Second session sets wasmPaths, expecting to "fix" the path globally.
+const b = await initSession(modelB, {
+  executionProvider: "webgpu",
+  wasmPaths: "/onnxruntime/", // too late — assets already resolved for the page
+});
+```
+
+Correct:
+
+```ts
+// Set wasmPaths on (or before) the FIRST session created on the page.
+const a = await initSession(modelA, {
+  executionProvider: "webgpu",
+  wasmPaths: "/onnxruntime/",
+});
+const b = await initSession(modelB, { executionProvider: "webgpu" }); // inherits the global
+```
+
+`wasmPaths` writes to `ort.env.wasm.wasmPaths`, a page-global singleton. The value set immediately before the first session is created wins; later assignments don't move already-loaded runtime assets. Configure it once, at the first `initSession`.
+
+Source: src/onnx/types.ts:63-67 (@remarks process-global singleton), src/onnx/session.ts:49-51
 
 ### HIGH Tension: library-owned onnxruntime-web vs consumer pinning
 
