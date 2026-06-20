@@ -16,8 +16,8 @@ importers:
         specifier: ^2.5.0
         version: 2.5.0
       '@tanstack/intent':
-        specifier: ^0.0.42
-        version: 0.0.42
+        specifier: ^0.0.43
+        version: 0.0.43
       '@vitest/coverage-v8':
         specifier: ^4.1.5
         version: 4.1.8(vitest@4.1.8)
@@ -754,8 +754,8 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@tanstack/intent@0.0.42':
-    resolution: {integrity: sha512-jRjArJ8wcMmi49tByK6KCrJxPp8EqFuFH+ltDG6HTPizTrBCAXkJB3dTtTXurLJh67YsPLzU0wLPdOtWYDuGSw==}
+  '@tanstack/intent@0.0.43':
+    resolution: {integrity: sha512-HT86nRKt8zxTMeBod9kGhRM2HpvLMc/cs8V6dUd3hHlsA4/JWuFVdcoyD0m9GDxn1ZD/Uc4450ZpdIBUB4UZRA==}
     hasBin: true
 
   '@tybys/wasm-util@0.10.2':
@@ -1165,11 +1165,6 @@ packages:
 
   scheduler@0.27.0:
     resolution: {integrity: sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==}
-
-  semver@7.7.4:
-    resolution: {integrity: sha512-vFKC2IEtQnVhpT78h1Yp8wzwrf8CM+MzKMHGJZfBtzhZNycRFnXsHk6E5TxIkkMsgNS7mdX3AGB7x2QM2di4lA==}
-    engines: {node: '>=10'}
-    hasBin: true
 
   semver@7.8.4:
     resolution: {integrity: sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA==}
@@ -1780,11 +1775,11 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@tanstack/intent@0.0.42':
+  '@tanstack/intent@0.0.43':
     dependencies:
       cac: 6.7.14
       jsonc-parser: 3.3.1
-      semver: 7.7.4
+      semver: 7.8.4
       yaml: 2.8.3
 
   '@tybys/wasm-util@0.10.2':
@@ -2222,8 +2217,6 @@ snapshots:
       '@rolldown/binding-win32-x64-msvc': 1.1.1
 
   scheduler@0.27.0: {}
-
-  semver@7.7.4: {}
 
   semver@7.8.4: {}
 
