@@ -16,8 +16,8 @@ importers:
         specifier: ^2.5.0
         version: 2.5.0
       '@tanstack/intent':
-        specifier: ^0.0.44
-        version: 0.0.44
+        specifier: ^0.1.0
+        version: 0.1.1
       '@vitest/coverage-v8':
         specifier: ^4.1.5
         version: 4.1.8(vitest@4.1.8)
@@ -754,8 +754,8 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@tanstack/intent@0.0.44':
-    resolution: {integrity: sha512-ZBe8uSqKXKjef+ILQt93Ld5LAi9uLs8AgnDI4QbbaWSF6GnjFgU2rjzcNsBd+fcL51+pyjjTw+amA/boNm9wGw==}
+  '@tanstack/intent@0.1.1':
+    resolution: {integrity: sha512-no5sg1ema9P96b47E2H4daQV0IlnQ8dMGj4OtQ6jD7Q32jia9xljoJ87Quo+7iKzRZH2xKWg8nnDG4coernkng==}
     hasBin: true
 
   '@tybys/wasm-util@0.10.2':
@@ -1775,7 +1775,7 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@tanstack/intent@0.0.44':
+  '@tanstack/intent@0.1.1':
     dependencies:
       cac: 6.7.14
       jsonc-parser: 3.3.1
