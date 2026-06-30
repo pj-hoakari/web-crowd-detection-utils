@@ -78,13 +78,13 @@
 		"test:coverage": "vitest run --coverage"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.5.0",
-		"@tanstack/intent": "^0.3.0",
-		"@vitest/coverage-v8": "^4.1.5",
-		"happy-dom": "^20.9.0",
-		"tsdown": "^0.22.0",
-		"typescript": "~6.0.3",
-		"vitest": "^4.1.5"
+		"@biomejs/biome": "2.5.0",
+		"@tanstack/intent": "0.3.2",
+		"@vitest/coverage-v8": "4.1.9",
+		"happy-dom": "20.10.6",
+		"tsdown": "0.22.3",
+		"typescript": "6.0.3",
+		"vitest": "4.1.9"
 	},
 	"keywords": [
 		"tanstack-intent"

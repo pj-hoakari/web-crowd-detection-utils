@@ -13,25 +13,25 @@ importers:
         version: 1.27.0
     devDependencies:
       '@biomejs/biome':
-        specifier: ^2.5.0
+        specifier: 2.5.0
         version: 2.5.0
       '@tanstack/intent':
-        specifier: ^0.3.0
+        specifier: 0.3.2
         version: 0.3.2
       '@vitest/coverage-v8':
-        specifier: ^4.1.5
+        specifier: 4.1.9
         version: 4.1.9(vitest@4.1.9)
       happy-dom:
-        specifier: ^20.9.0
+        specifier: 20.10.6
         version: 20.10.6
       tsdown:
-        specifier: ^0.22.0
+        specifier: 0.22.3
         version: 0.22.3(typescript@6.0.3)(unrun@0.2.37)
       typescript:
-        specifier: ~6.0.3
+        specifier: 6.0.3
         version: 6.0.3
       vitest:
-        specifier: ^4.1.5
+        specifier: 4.1.9
         version: 4.1.9(@types/node@26.0.1)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(vite@8.0.16(@types/node@26.0.1)(esbuild@0.27.7)(yaml@2.9.0))
 
   example/crowd-line-counting:
@@ -47,7 +47,7 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@types/node':
-        specifier: ^24.12.2
+        specifier: 24.13.2
         version: 24.13.2
       '@types/react':
         specifier: 19.2.17
@@ -56,13 +56,13 @@ importers:
         specifier: 19.2.3
         version: 19.2.3(@types/react@19.2.17)
       '@vitejs/plugin-react':
-        specifier: ^6.0.1
+        specifier: 6.0.2
         version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(yaml@2.9.0))
       typescript:
-        specifier: ~6.0.2
+        specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: ^8.0.10
+        specifier: 8.0.16
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(yaml@2.9.0)
 
   example/yolo-bytetrack-video:
@@ -78,7 +78,7 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@types/node':
-        specifier: ^24.12.2
+        specifier: 24.13.2
         version: 24.13.2
       '@types/react':
         specifier: 19.2.17
@@ -87,13 +87,13 @@ importers:
         specifier: 19.2.3
         version: 19.2.3(@types/react@19.2.17)
       '@vitejs/plugin-react':
-        specifier: ^6.0.1
+        specifier: 6.0.2
         version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(yaml@2.9.0))
       typescript:
-        specifier: ~6.0.2
+        specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: ^8.0.10
+        specifier: 8.0.16
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(yaml@2.9.0)
 
   example/yolo-webcam:
@@ -109,7 +109,7 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@types/node':
-        specifier: ^24.12.2
+        specifier: 24.13.2
         version: 24.13.2
       '@types/react':
         specifier: 19.2.17
@@ -118,13 +118,13 @@ importers:
         specifier: 19.2.3
         version: 19.2.3(@types/react@19.2.17)
       '@vitejs/plugin-react':
-        specifier: ^6.0.1
+        specifier: 6.0.2
         version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(yaml@2.9.0))
       typescript:
-        specifier: ~6.0.2
+        specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: ^8.0.10
+        specifier: 8.0.16
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(yaml@2.9.0)
 
 packages:
@@ -414,12 +414,6 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
-
-  '@napi-rs/wasm-runtime@1.1.5':
-    resolution: {integrity: sha512-AWPoBRJ9tsnVhor4sjO7rkni+7p+2IAEFj6cx06UgP10jkQHqay/36uRV/bFkgrh18D9vb4cr8Q0Pthskgzy+Q==}
-    peerDependencies:
-      '@emnapi/core': ^1.7.1
-      '@emnapi/runtime': ^1.7.1
 
   '@napi-rs/wasm-runtime@1.1.6':
     resolution: {integrity: sha512-ZLv/JdUfkvOy9eCnnBaGfiO+XimbjebAeO+MRQqD/B+FR1tnRN0tpKSJHRbE8sFfS6aqsXZ67TQjfwfsxULVbg==}
@@ -763,9 +757,6 @@ packages:
   '@tanstack/intent@0.3.2':
     resolution: {integrity: sha512-Apyfkf0O8QqHQJjy/cB1QW2GpYTOyjf98nFAaYtzjBc0V5YzJoy0wnmZSLvwBJxE8/Hhy0Bsa+EPt/fdeJyXkw==}
     hasBin: true
-
-  '@tybys/wasm-util@0.10.2':
-    resolution: {integrity: sha512-RoBvJ2X0wuKlWFIjrwffGw1IqZHKQqzIchKaadZZfnNpsAYp2mM0h36JtPCjNDAHGgYez/15uMBpfGwchhiMgg==}
 
   '@tybys/wasm-util@0.10.3':
     resolution: {integrity: sha512-F3fo1MYrRJYL3zER0OUOmkutjr1Vp23m7OsSgp7nq4SP6OqX6C/56XFIPAl5bt3zaBRjmW7SGz3u/6LwFpYcOg==}
@@ -1582,17 +1573,17 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@napi-rs/wasm-runtime@1.1.5(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
-    dependencies:
-      '@emnapi/core': 1.11.1
-      '@emnapi/runtime': 1.11.1
-      '@tybys/wasm-util': 0.10.2
-    optional: true
-
   '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:
       '@emnapi/core': 1.10.0
       '@emnapi/runtime': 1.10.0
+      '@tybys/wasm-util': 0.10.3
+    optional: true
+
+  '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
+    dependencies:
+      '@emnapi/core': 1.11.1
+      '@emnapi/runtime': 1.11.1
       '@tybys/wasm-util': 0.10.3
     optional: true
 
@@ -1753,7 +1744,7 @@ snapshots:
     dependencies:
       '@emnapi/core': 1.11.1
       '@emnapi/runtime': 1.11.1
-      '@napi-rs/wasm-runtime': 1.1.5(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)
+      '@napi-rs/wasm-runtime': 1.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)
     optional: true
 
   '@rolldown/binding-win32-arm64-msvc@1.0.0-rc.17':
@@ -1789,11 +1780,6 @@ snapshots:
       std-env: 4.1.0
       yaml: 2.9.0
 
-  '@tybys/wasm-util@0.10.2':
-    dependencies:
-      tslib: 2.8.1
-    optional: true
-
   '@tybys/wasm-util@0.10.3':
     dependencies:
       tslib: 2.8.1
@@ -1817,6 +1803,7 @@ snapshots:
   '@types/node@26.0.1':
     dependencies:
       undici-types: 8.3.0
+    optional: true
 
   '@types/react-dom@19.2.3(@types/react@19.2.17)':
     dependencies:
@@ -1830,7 +1817,7 @@ snapshots:
 
   '@types/ws@8.18.1':
     dependencies:
-      '@types/node': 26.0.1
+      '@types/node': 24.13.2
 
   '@vitejs/plugin-react@6.0.2(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(yaml@2.9.0))':
     dependencies:
@@ -1912,7 +1899,7 @@ snapshots:
 
   buffer-image-size@0.6.4:
     dependencies:
-      '@types/node': 26.0.1
+      '@types/node': 24.13.2
 
   cac@6.7.14: {}
 
@@ -1989,7 +1976,7 @@ snapshots:
 
   happy-dom@20.10.6:
     dependencies:
-      '@types/node': 26.0.1
+      '@types/node': 24.13.2
       '@types/whatwg-mimetype': 3.0.2
       '@types/ws': 8.18.1
       buffer-image-size: 0.6.4
@@ -2132,7 +2119,7 @@ snapshots:
       '@protobufjs/path': 1.1.2
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.1
-      '@types/node': 26.0.1
+      '@types/node': 24.13.2
       long: 5.3.2
 
   quansync@1.0.0: {}
@@ -2293,7 +2280,8 @@ snapshots:
 
   undici-types@7.18.2: {}
 
-  undici-types@8.3.0: {}
+  undici-types@8.3.0:
+    optional: true
 
   unrun@0.2.37:
     dependencies:
