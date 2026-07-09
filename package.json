@@ -81,11 +81,11 @@
 	"devDependencies": {
 		"@biomejs/biome": "2.5.2",
 		"@tanstack/intent": "0.3.2",
-		"@vitest/coverage-v8": "4.1.9",
+		"@vitest/coverage-v8": "4.1.10",
 		"happy-dom": "20.10.6",
 		"tsdown": "0.22.3",
 		"typescript": "6.0.3",
-		"vitest": "4.1.9"
+		"vitest": "4.1.10"
 	},
 	"keywords": [
 		"tanstack-intent"
