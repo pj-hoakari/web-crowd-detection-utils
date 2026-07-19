@@ -18,7 +18,7 @@
 		"registry": "https://npm.pkg.github.com",
 		"access": "public"
 	},
-	"packageManager": "pnpm@11.11.0",
+	"packageManager": "pnpm@11.13.1",
 	"engines": {
 		"node": ">=20"
 	},
