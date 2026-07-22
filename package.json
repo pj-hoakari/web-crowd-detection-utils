@@ -83,7 +83,7 @@
 		"@tanstack/intent": "0.3.6",
 		"@vitest/coverage-v8": "4.1.10",
 		"happy-dom": "20.11.0",
-		"tsdown": "0.22.8",
+		"tsdown": "0.22.9",
 		"typescript": "6.0.3",
 		"vitest": "4.1.10"
 	},
