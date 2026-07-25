@@ -82,7 +82,7 @@
 		"@biomejs/biome": "2.5.5",
 		"@tanstack/intent": "0.3.6",
 		"@vitest/coverage-v8": "4.1.10",
-		"happy-dom": "20.11.0",
+		"happy-dom": "20.11.1",
 		"tsdown": "0.22.9",
 		"typescript": "6.0.3",
 		"vitest": "4.1.10"
