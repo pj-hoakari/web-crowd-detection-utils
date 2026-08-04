@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_FORWARD_DIRECTION } from "./constants";
 import { LineCrossingCounter } from "./counter";
 import { forwardNormal } from "./direction";
-import type { Line } from "./types";
+import type { Line, Vector } from "./types";
 
 const VLINE: Line = { id: "v", p1: { x: 10, y: 0 }, p2: { x: 10, y: 20 } };
 const HLINE: Line = { id: "h", p1: { x: 0, y: 10 }, p2: { x: 20, y: 10 } };
+
+/** Every direction reversed — the inverse of a forward policy. */
+function reversed(directions: readonly Vector[]): Vector[] {
+	return directions.map((v) => ({ x: -v.x, y: -v.y }));
+}
 
 describe("forwardNormal", () => {
 	it("defaults to rightward for a vertical line", () => {
@@ -68,5 +74,62 @@ describe("forwardNormal", () => {
 		c.update([{ trackId: 1, point: { x: 5, y: 10 } }], [line]);
 		expect(n.x).toBeLessThan(0);
 		expect(c.getLineCount("v")).toEqual({ forward: 1, backward: 0 });
+	});
+});
+
+describe("reversing a forward policy", () => {
+	const LINES: readonly Line[] = [
+		VLINE,
+		HLINE,
+		{ id: "d", p1: { x: 0, y: 0 }, p2: { x: 20, y: 20 } }, // exactly 45°
+		{ id: "o", p1: { x: 0, y: 0 }, p2: { x: 3, y: 4 } },
+		{ id: "r", p1: { x: 20, y: 20 }, p2: { x: 0, y: 0 } }, // reversed endpoints
+	];
+
+	it.each(LINES.map((line) => [line.id, line] as const))(
+		"reversing every direction flips the forward side of the %s line",
+		(_id, line) => {
+			const base = forwardNormal(line);
+			const flipped = forwardNormal({
+				...line,
+				forwardDirection: reversed(DEFAULT_FORWARD_DIRECTION),
+			});
+			// The same list entry still resolves the side; only its sign changes.
+			expect(flipped.x).toBeCloseTo(-base.x);
+			expect(flipped.y).toBeCloseTo(-base.y);
+		},
+	);
+
+	it("does not flip when every reversed direction is still parallel to the line", () => {
+		// A parallel direction resolves no side, so both fall through to the
+		// default — reversing a policy only flips lines it can actually resolve.
+		const down = forwardNormal({ ...VLINE, forwardDirection: { x: 0, y: 1 } });
+		const up = forwardNormal({ ...VLINE, forwardDirection: { x: 0, y: -1 } });
+		expect(up).toEqual(down);
+		expect(up).toEqual(forwardNormal(VLINE));
+	});
+
+	it("flips one line while the rest keep the shared policy", () => {
+		const c = new LineCrossingCounter();
+		const shared: Line = {
+			id: "shared",
+			p1: { x: 10, y: 0 },
+			p2: { x: 10, y: 20 },
+		};
+		const flipped: Line = {
+			id: "flipped",
+			p1: { x: 12, y: 0 },
+			p2: { x: 12, y: 20 },
+			forwardDirection: reversed(DEFAULT_FORWARD_DIRECTION),
+		};
+		const lines = [
+			{ ...shared, forwardDirection: DEFAULT_FORWARD_DIRECTION },
+			flipped,
+		];
+		// One rightward move crosses both lines at x = 10 and x = 12.
+		c.update([{ trackId: 1, point: { x: 5, y: 10 } }], lines);
+		c.update([{ trackId: 1, point: { x: 15, y: 10 } }], lines);
+		expect(c.getLineCount("shared")).toEqual({ forward: 1, backward: 0 });
+		expect(c.getLineCount("flipped")).toEqual({ forward: 0, backward: 1 });
 	});
 });
