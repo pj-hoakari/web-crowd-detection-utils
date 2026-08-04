@@ -11,7 +11,7 @@
 | multi-object-tracking  | Turning per-frame `Detection[]` into stable, ID-bearing tracks via `BYTETracker`, including occlusion / re-identification semantics.                 | integrate-tracking                                              |
 | runtime-setup          | Initializing onnxruntime-web sessions in a browser-safe way (WebGPU/WASM, SSR, preprocess buffer ownership) for both YOLO and non-YOLO models.       | set-up-onnx-runtime                                             |
 | static-suppression     | Reducing false positives on static scenery by attenuating the confidence of detections that don't move, via the detector-agnostic EMA background model. | suppress-static-detections                                      |
-| line-crossing-counting | Counting tracked objects that cross virtual lines (per-direction tallies) via the detector- and tracker-agnostic LineCrossingCounter, after tracking.       | count-line-crossings                                            |
+| line-crossing-counting | Counting tracked objects that cross virtual lines (per-direction tallies) via the detector- and tracker-agnostic LineCrossingCounter, after tracking. Which side counts as `forward` is configured per line, independently of endpoint order. | count-line-crossings                                            |
 
 ## Skill Inventory
 
@@ -23,7 +23,7 @@
 | integrate-tracking             | core | multi-object-tracking | `BYTETracker`, stateful lifecycle, `Observation` / `Detection` compat, threshold roles, per-class pattern     | 7             |
 | set-up-onnx-runtime            | core | runtime-setup         | `initSession`, `isWebGpuAvailable`, `createPreprocessor`, SSR safety, owned `onnxruntime-web`, `wasmPaths` self-hosting (`wcdu-copy-runtime-assets` CLI), Worker compatibility (all subpaths run in a worker; source via OffscreenCanvas) | 9             |
 | suppress-static-detections     | core | static-suppression    | `BackgroundSubtractor`, model-space `suppressStatic` (score attenuation, not removal), warm-up/`reset()`, tuning | 6             |
-| count-line-crossings           | core | line-crossing-counting | `LineCrossingCounter`, caller-anchored `{trackId,point}` + `Line{p1,p2}`, side+segment crossing test, crossing-assist (rescue/cooldown) | 6             |
+| count-line-crossings           | core | line-crossing-counting | `LineCrossingCounter`, caller-anchored `{trackId,point}` + `Line{p1,p2,forwardDirection?}`, side+segment crossing test, `forwardNormal` / `reverseDirection` / `DEFAULT_FORWARD_DIRECTION`, crossing-assist (rescue/cooldown) | 8             |
 
 ## Failure Mode Inventory
 
@@ -94,7 +94,7 @@
 | 5   | Default alpha absorbs stationary people into the background  | MEDIUM   | src/background/constants.ts:13-30, maintainer interview              | —                                                  |
 | 6   | Not calling reset() after switching sources                  | MEDIUM   | src/background/subtractor.ts:243-253                                  | —                                                  |
 
-### count-line-crossings (6 failure modes)
+### count-line-crossings (8 failure modes)
 
 | #   | Mistake                                                      | Priority | Source                                                                | Cross-skill?                                       |
 | --- | ------------------------------------------------------------ | -------- | --------------------------------------------------------------------- | -------------------------------------------------- |
@@ -103,7 +103,9 @@
 | 3   | Re-instantiating LineCrossingCounter per frame               | CRITICAL | src/line-crossing/counter.ts (prevPoint state), interview              | —                                                  |
 | 4   | Expecting the counter to compute the anchor point itself     | HIGH     | src/line-crossing/types.ts (TrackedPoint), counter.ts                  | —                                                  |
 | 5   | Skipping crossing-assist under ID churn / cooldown misuse    | MEDIUM   | src/line-crossing/counter.ts, constants.ts, maintainer interview      | —                                                  |
-| 6   | Assuming forward always means left-to-right                  | MEDIUM   | src/line-crossing/counter.ts (sideOf sign), types.ts (LineCount)       | —                                                  |
+| 6   | Leaving a semantic direction implicit                        | MEDIUM   | src/line-crossing/direction.ts (forwardSideOf), types.ts:40-68, constants.ts:12-15 | —                                      |
+| 7   | A `forwardDirection` parallel to its line falls back to the default | MEDIUM | src/line-crossing/direction.ts:29-69 (resolveSide), :119-155 (reverseDirection) | —                                  |
+| 8   | Expecting a changed `forwardDirection` to re-tally past crossings | MEDIUM | src/line-crossing/counter.ts:112-137 (update @param lines), :245-252   | —                                                  |
 
 ## Tensions
 
@@ -147,7 +149,7 @@
 | integrate-tracking         | —                                                                                                                   | BYTETrackerOptions threshold cheat-sheet (highThresh, matchThresh, secondMatchThresh, unconfirmedMatchThresh, newTrackThresh, duplicateIouThresh, trackBuffer) |
 | set-up-onnx-runtime        | —                                                                                                                   | InitSessionOptions field reference (graphOptimizationLevel, sessionOptions Omit, wasmPaths self-hosting); subpath Worker compatibility table (all subpaths run in a worker; source via OffscreenCanvas; only consumer-side captureStream() needs the main thread) |
 | suppress-static-detections | —                                                                                                                   | — (5-option config surface; no dense API or independent subsystems — no references/ file needed)                                                          |
-| count-line-crossings       | —                                                                                                                   | — (single counter + 3-field assist config; no dense API or independent subsystems — no references/ file needed)                                            |
+| count-line-crossings       | —                                                                                                                   | — (single counter + 3-field assist config + 2 direction helpers; no dense API or independent subsystems — no references/ file needed)                      |
 
 ## Recommended Skill File Structure
 
