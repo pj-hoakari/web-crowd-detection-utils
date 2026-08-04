@@ -1,16 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_FORWARD_DIRECTION } from "./constants";
 import { LineCrossingCounter } from "./counter";
-import { forwardNormal } from "./direction";
-import type { Line, Vector } from "./types";
+import { forwardNormal, reverseDirection } from "./direction";
+import type { Line } from "./types";
 
 const VLINE: Line = { id: "v", p1: { x: 10, y: 0 }, p2: { x: 10, y: 20 } };
 const HLINE: Line = { id: "h", p1: { x: 0, y: 10 }, p2: { x: 20, y: 10 } };
-
-/** Every direction reversed — the inverse of a forward policy. */
-function reversed(directions: readonly Vector[]): Vector[] {
-	return directions.map((v) => ({ x: -v.x, y: -v.y }));
-}
 
 describe("forwardNormal", () => {
 	it("defaults to rightward for a vertical line", () => {
@@ -92,7 +87,7 @@ describe("reversing a forward policy", () => {
 			const base = forwardNormal(line);
 			const flipped = forwardNormal({
 				...line,
-				forwardDirection: reversed(DEFAULT_FORWARD_DIRECTION),
+				forwardDirection: reverseDirection(),
 			});
 			// The same list entry still resolves the side; only its sign changes.
 			expect(flipped.x).toBeCloseTo(-base.x);
@@ -109,6 +104,42 @@ describe("reversing a forward policy", () => {
 		expect(up).toEqual(forwardNormal(VLINE));
 	});
 
+	it("reverses a single direction into a one-entry list", () => {
+		expect(reverseDirection({ x: 1, y: 0 })).toEqual([{ x: -1, y: 0 }]);
+	});
+
+	it("reverses the default when given no directions", () => {
+		expect(reverseDirection()).toEqual([
+			{ x: -1, y: 0 },
+			{ x: 0, y: -1 },
+		]);
+	});
+
+	it("keeps each entry's position so the resolving entry stays the same", () => {
+		const policy = [
+			{ x: -1, y: -1 },
+			{ x: 0, y: -1 },
+		];
+		expect(reverseDirection(policy)).toEqual([
+			{ x: 1, y: 1 },
+			{ x: 0, y: 1 },
+		]);
+	});
+
+	it("does not mutate the directions it is given", () => {
+		const policy = [{ x: 1, y: 0 }];
+		reverseDirection(policy);
+		expect(policy).toEqual([{ x: 1, y: 0 }]);
+	});
+
+	it("returns to the original policy when applied twice", () => {
+		const policy = [
+			{ x: -1, y: -1 },
+			{ x: 0, y: -1 },
+		];
+		expect(reverseDirection(reverseDirection(policy))).toEqual(policy);
+	});
+
 	it("flips one line while the rest keep the shared policy", () => {
 		const c = new LineCrossingCounter();
 		const shared: Line = {
@@ -120,7 +151,7 @@ describe("reversing a forward policy", () => {
 			id: "flipped",
 			p1: { x: 12, y: 0 },
 			p2: { x: 12, y: 20 },
-			forwardDirection: reversed(DEFAULT_FORWARD_DIRECTION),
+			forwardDirection: reverseDirection(),
 		};
 		const lines = [
 			{ ...shared, forwardDirection: DEFAULT_FORWARD_DIRECTION },

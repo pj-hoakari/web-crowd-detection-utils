@@ -5,7 +5,7 @@ export {
 	DEFAULT_RESCUE_FRAMES,
 } from "./constants";
 export { LineCrossingCounter } from "./counter";
-export { forwardNormal } from "./direction";
+export { forwardNormal, reverseDirection } from "./direction";
 export type {
 	CrossingAssistConfig,
 	CrossingDirection,

@@ -39,6 +39,18 @@ function resolveSide(
 }
 
 /**
+ * The two accepted shapes of {@link Line.forwardDirection} as one list.
+ *
+ * @internal
+ */
+function toDirectionList(
+	directions: Vector | readonly Vector[],
+): readonly Vector[] {
+	// `Array.isArray` does not narrow a `readonly` array out of the union.
+	return "x" in directions ? [directions] : directions;
+}
+
+/**
  * Signed side of `line` that its crossings count as `forward`, matching the sign
  * convention of the counter's internal side test.
  *
@@ -49,11 +61,7 @@ export function forwardSideOf(line: Line): number {
 	const dy = line.p2.y - line.p1.y;
 	const configured = line.forwardDirection;
 	if (configured !== undefined) {
-		const side = resolveSide(
-			dx,
-			dy,
-			Array.isArray(configured) ? configured : [configured],
-		);
+		const side = resolveSide(dx, dy, toDirectionList(configured));
 		if (side !== 0) return side;
 	}
 	// Every configured direction is parallel to (or degenerate for) this line.
@@ -106,4 +114,42 @@ export function forwardNormal(line: Line): Vector {
  */
 function unsigned(v: number): number {
 	return v === 0 ? 0 : v;
+}
+
+/**
+ * Reverses a {@link Line.forwardDirection}, producing the policy that counts the
+ * opposite side of a line as `forward`.
+ *
+ * @param directions - A forward direction or ordered list of them, typically a
+ *   line's current {@link Line.forwardDirection}. `undefined` is read as
+ *   {@link DEFAULT_FORWARD_DIRECTION}, so a line left on the default reverses
+ *   like any other.
+ * @returns A fresh list of reversed directions; the argument is not mutated.
+ *
+ * @remarks
+ * Because every entry keeps its position in the list, the same entry resolves
+ * the side for a given line and only its sign changes — the result is the exact
+ * opposite side for every line the original policy could resolve. The exception
+ * is a line every supplied direction is *parallel* to: neither the original nor
+ * the reversed list selects a side there, so both fall through to
+ * {@link DEFAULT_FORWARD_DIRECTION} and the line does not flip. Keep two
+ * directions that are not parallel to each other in the list to rule that out.
+ *
+ * @example
+ * A per-line "flip" toggle over one shared policy:
+ * ```ts
+ * const lines = drawn.map((l) => ({
+ *   ...l,
+ *   forwardDirection: flipped.has(l.id) ? reverseDirection(FORWARD) : FORWARD,
+ * }));
+ * ```
+ */
+export function reverseDirection(
+	directions?: Vector | readonly Vector[],
+): Vector[] {
+	const list =
+		directions === undefined
+			? DEFAULT_FORWARD_DIRECTION
+			: toDirectionList(directions);
+	return list.map((v) => ({ x: unsigned(-v.x), y: unsigned(-v.y) }));
 }
