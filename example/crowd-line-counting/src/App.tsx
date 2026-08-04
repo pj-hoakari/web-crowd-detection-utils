@@ -1,6 +1,8 @@
-import type {
-	Line,
-	Point,
+import {
+	type Line,
+	type Point,
+	reverseDirection,
+	type Vector,
 } from "@pj-hoakari/web-crowd-detection-utils/line-crossing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
@@ -23,6 +25,18 @@ const ZERO_STATS: PipelineStats = {
 	forward: 0,
 	backward: 0,
 };
+
+/**
+ * Forward direction every line this example draws starts with: rightward, and
+ * downward for a horizontal line, which rightward cannot decide. It happens to
+ * match `DEFAULT_FORWARD_DIRECTION`, but is pinned here to show how a host app
+ * fixes the semantics it wants; either way the click order of the two endpoints
+ * cannot flip the tally. **Flip direction** swaps it with `reverseDirection`.
+ */
+const FORWARD_DIRECTION: Vector[] = [
+	{ x: 1, y: 0 },
+	{ x: 0, y: 1 },
+];
 
 function App() {
 	const videoRef = useRef<HTMLVideoElement>(null);
@@ -242,6 +256,7 @@ function App() {
 				id: LINE_ID,
 				p1: { x: Math.round(w / 2), y: 0 },
 				p2: { x: Math.round(w / 2), y: h },
+				forwardDirection: FORWARD_DIRECTION,
 			});
 		}
 	}, [post]);
@@ -271,7 +286,12 @@ function App() {
 			if (p1.x === p2.x && p1.y === p2.y) {
 				return;
 			}
-			setLine({ id: LINE_ID, p1, p2 });
+			setLine({
+				id: LINE_ID,
+				p1,
+				p2,
+				forwardDirection: FORWARD_DIRECTION,
+			});
 			setDraft(null);
 			setDrawMode(false);
 			// A redrawn line is a fresh measurement: zero the tally (live + display).
@@ -340,6 +360,18 @@ function App() {
 	}, []);
 
 	const handleResetCounts = useCallback(() => {
+		post({ type: "resetCounts" });
+		setStats((s) => ({ ...s, forward: 0, backward: 0 }));
+	}, [post]);
+
+	const handleFlipDirection = useCallback(() => {
+		// The line keeps its endpoints; only which side counts as forward changes.
+		setLine((l) =>
+			l ? { ...l, forwardDirection: reverseDirection(l.forwardDirection) } : l,
+		);
+		// Crossings already tallied were counted under the old direction, so the
+		// two numbers would no longer mean one thing. Start the measurement over,
+		// as redrawing the line does.
 		post({ type: "resetCounts" });
 		setStats((s) => ({ ...s, forward: 0, backward: 0 }));
 	}, [post]);
@@ -449,6 +481,9 @@ function App() {
 				>
 					{drawMode ? "Drawing… (click 2 points)" : "Draw line"}
 				</button>
+				<button type="button" onClick={handleFlipDirection} disabled={!line}>
+					Flip direction
+				</button>
 				<button type="button" onClick={handleResetCounts} disabled={!line}>
 					Reset counts
 				</button>
@@ -509,10 +544,10 @@ function App() {
 			</div>
 
 			<p className="hint">
-				The <strong>green arrow</strong> on the line points to its{" "}
-				<em>forward</em> side. Forward / backward follow the line's drawing
-				direction (p1→p2), not screen left / right — redraw with the endpoints
-				reversed to flip them.
+				The <strong>green arrow</strong> on the line points at the side counted
+				as <em>forward</em>. Forward / backward follow the line's configured{" "}
+				<code>forwardDirection</code>, not the order its endpoints were clicked
+				— press <strong>Flip direction</strong> to reverse it.
 			</p>
 
 			<div className="stage">

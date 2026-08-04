@@ -36,9 +36,9 @@ export interface PipelineStats {
 	current: number;
 	/** Distinct track ids seen since the run started. */
 	unique: number;
-	/** Crossings of the line toward its positive (`p1`→`p2`) side. */
+	/** Crossings onto the side the line's `forwardDirection` points at. */
 	forward: number;
-	/** Crossings of the line toward its negative side. */
+	/** Crossings onto the opposite side. */
 	backward: number;
 }
 
