@@ -15,6 +15,13 @@
 #   (wasmPaths self-hosting + wcdu-copy-runtime-assets CLI, added
 #   src/bin/copy-runtime-assets.ts source) and set-up-detection-pipeline
 #   (session.wasmPaths pass-through). Still flat/no-router.
+# Revision: 2026-08-04 diff-audit pass — reconciled with the configurable line
+#   direction (commits b173f98, e71e428). No new skills: forwardDirection /
+#   forwardNormal / reverseDirection extend the existing LineCrossingCounter
+#   surface rather than opening a domain of their own, and the direction rule is
+#   inseparable from reading a crossing tally. Updated count-line-crossings
+#   (forwardDirection semantics, added src/line-crossing/direction.ts source).
+#   7 skills, still flat/no-router (well under the 15+ router threshold).
 library:
   name: "@pj-hoakari/web-crowd-detection-utils"
   version: "0.0.0"
@@ -161,13 +168,19 @@ skills:
       Tally how many tracked objects cross each virtual line, per direction, with
       LineCrossingCounter. Post-tracking: the caller reduces each tracked detection
       to an anchor point (e.g. foot {(x1+x2)/2, y2}) and passes { trackId, point }
-      plus lines defined by two anchor endpoints { id, p1, p2 }. Detector- and
-      tracker-agnostic, stateful (one instance per stream), no drawing; points and
-      lines must share one coordinate space (no scaling). Optional crossing-assist
+      plus lines defined by two anchor endpoints and an optional forward direction
+      { id, p1, p2, forwardDirection }. Detector- and tracker-agnostic, stateful
+      (one instance per stream), no drawing; points and lines must share one
+      coordinate space (no scaling). forwardDirection (a Vector, or an ordered
+      Vector[] whose first entry not parallel to the line wins) fixes which side
+      counts as forward independently of endpoint order, defaulting to
+      DEFAULT_FORWARD_DIRECTION; forwardNormal exposes the resolved side for
+      overlays and reverseDirection flips a line's policy. Optional crossing-assist
       (rescue / cooldown) survives tracker ID churn; defaults DEFAULT_RESCUE_DISTANCE
       / DEFAULT_RESCUE_FRAMES / DEFAULT_COOLDOWN_FRAMES.
     sources:
       - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/counter.ts"
+      - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/direction.ts"
       - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/types.ts"
       - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/constants.ts"
       - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/index.ts"

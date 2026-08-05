@@ -12,9 +12,10 @@ description: >
   (apply BEFORE the reverse transform; subtractor width×height must match the box
   space), Box / ScoredBox compatibility with Detection / Observation / TrackedBox,
   and reset() on source switch.
-type: core
-library: web-crowd-detection-utils
-library_version: "0.0.0"
+metadata:
+  type: core
+  library: web-crowd-detection-utils
+  library_version: "0.0.0"
 sources:
   - "pj-hoakari/web-crowd-detection-utils:src/background/subtractor.ts"
   - "pj-hoakari/web-crowd-detection-utils:src/background/types.ts"

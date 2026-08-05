@@ -1,8 +1,9 @@
 import type { TrackedBox } from "@pj-hoakari/web-crowd-detection-utils/bytetrack";
-import type {
-	Line,
-	LineCount,
-	Point,
+import {
+	forwardNormal,
+	type Line,
+	type LineCount,
+	type Point,
 } from "@pj-hoakari/web-crowd-detection-utils/line-crossing";
 
 /**
@@ -20,9 +21,9 @@ import type {
  * DOM `HTMLCanvasElement` for `getBoundingClientRect()`.
  */
 
-/** Crossings toward the line's positive side (`p1`→`p2`); rendered green. */
+/** Crossings onto the side the line's `forwardDirection` points at; rendered green. */
 export const FORWARD_COLOR = "#00ff88";
-/** Crossings toward the line's negative side; rendered orange. */
+/** Crossings onto the opposite side; rendered orange. */
 export const BACKWARD_COLOR = "#ffb020";
 const LINE_COLOR = "#39d0ff";
 const TRACK_COLOR = "#00ff88";
@@ -137,24 +138,20 @@ export function drawLine(
 		ctx.fill();
 	}
 
-	// Forward-normal arrow at the midpoint. Forward = negative→positive side of
-	// the directed line p1→p2; that side lies along the normal n = (-dy, dx).
-	const dx = line.p2.x - line.p1.x;
-	const dy = line.p2.y - line.p1.y;
-	const len = Math.hypot(dx, dy) || 1;
-	const nx = -dy / len;
-	const ny = dx / len;
+	// Arrow at the midpoint, along the side the counter tallies as forward. The
+	// library resolves it, so the drawing can never disagree with the tally.
 	const midX = (line.p1.x + line.p2.x) / 2;
 	const midY = (line.p1.y + line.p2.y) / 2;
+	const n = forwardNormal(line);
 	const arrow = Math.max(24, canvas.width / 18);
-	drawArrow(ctx, midX, midY, midX + nx * arrow, midY + ny * arrow, lineWidth);
+	drawArrow(ctx, midX, midY, midX + n.x * arrow, midY + n.y * arrow, lineWidth);
 
 	// Count label near the midpoint, offset to the forward side.
 	const fontSize = Math.max(13, Math.round(canvas.width / 52));
 	ctx.font = `${fontSize}px sans-serif`;
 	ctx.textBaseline = "top";
-	const labelX = midX + nx * (arrow + 8);
-	const labelY = midY + ny * (arrow + 8);
+	const labelX = midX + n.x * (arrow + 8);
+	const labelY = midY + n.y * (arrow + 8);
 	drawCountBadge(ctx, labelX, labelY, count, fontSize);
 
 	ctx.restore();

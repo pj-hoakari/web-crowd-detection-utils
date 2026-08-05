@@ -5,17 +5,23 @@ description: >
   LineCrossingCounter. Load when an agent counts people entering / exiting across
   a line, adds in/out counting after BYTETracker, calls update / getLineCount /
   getAllCounts / reset / resetCounts / clearPositions, defines lines by two anchor
-  endpoints { id, p1, p2 }, or tunes crossing-assist (rescueDistance / rescueFrames
-  / cooldownFrames). Covers caller-anchored TrackedPoint { trackId, point } input
+  endpoints plus an optional forward direction
+  { id, p1, p2, forwardDirection }, draws that direction with forwardNormal,
+  flips a line's direction with reverseDirection, or
+  tunes crossing-assist (rescueDistance / rescueFrames / cooldownFrames). Covers
+  caller-anchored TrackedPoint { trackId, point } input
   (the counter never reads boxes), the side-of-line + segment-intersection crossing
   test, statefulness (one instance per stream), the shared-coordinate-space
-  requirement (no scaling), forward/backward direction from p1→p2 orientation, and
-  rescue / cooldown ID-churn assist.
-type: core
-library: web-crowd-detection-utils
-library_version: "0.0.0"
+  requirement (no scaling), forward/backward direction configured independently of
+  endpoint order (single Vector or ordered Vector[] fallback,
+  DEFAULT_FORWARD_DIRECTION), and rescue / cooldown ID-churn assist.
+metadata:
+  type: core
+  library: web-crowd-detection-utils
+  library_version: "0.0.0"
 sources:
   - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/counter.ts"
+  - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/direction.ts"
   - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/types.ts"
   - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/constants.ts"
   - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/index.ts"
@@ -24,7 +30,7 @@ sources:
 
 # Count tracked objects crossing virtual lines
 
-`LineCrossingCounter` tallies how many tracked objects cross each line, per direction, across a stream of frames. It is **detector- and tracker-agnostic** and does **no drawing**: the caller reduces each tracked detection to an anchor point (e.g. the bounding-box foot) and passes `{ trackId, point }`, plus the lines — each a segment defined by its two anchor endpoints `{ id, p1, p2 }`. It is **stateful** (one instance per stream; it compares each track's point against the point it held last frame) and does **no scaling**, so the points and the line endpoints must live in one coordinate space. Optional crossing-assist compensates for tracker ID churn.
+`LineCrossingCounter` tallies how many tracked objects cross each line, per direction, across a stream of frames. It is **detector- and tracker-agnostic** and does **no drawing**: the caller reduces each tracked detection to an anchor point (e.g. the bounding-box foot) and passes `{ trackId, point }`, plus the lines — each a segment defined by its two anchor endpoints and, when a semantic direction is needed, the direction that counts as `forward`: `{ id, p1, p2, forwardDirection }`. It is **stateful** (one instance per stream; it compares each track's point against the point it held last frame) and does **no scaling**, so the points and the line endpoints must live in one coordinate space. Optional crossing-assist compensates for tracker ID churn.
 
 ## Setup
 
@@ -34,7 +40,12 @@ import type { Line } from "@pj-hoakari/web-crowd-detection-utils/line-crossing";
 
 const counter = new LineCrossingCounter(); // one instance, lives across all frames
 // Lines in the SAME coordinate space as the points fed below (here: source space).
-const lines: Line[] = [{ id: "door", p1: { x: 320, y: 0 }, p2: { x: 320, y: 480 } }];
+const lines: Line[] = [{
+  id: "door",
+  p1: { x: 320, y: 0 },
+  p2: { x: 320, y: 480 },
+  forwardDirection: { x: 1, y: 0 }, // crossings toward the right count as forward
+}];
 
 while (!signal.aborted) {
   const { imageData, params } = capturer.capture(video);
@@ -58,10 +69,60 @@ while (!signal.aborted) {
 ### In/out counting on an entry line
 
 ```ts
-// forward / backward follow the line's p1→p2 orientation (sign of the 2-D cross
-// product), NOT screen left/right. Decide which direction is "in" for your line once.
+// forward = crossings onto the side forwardDirection points at, whatever order
+// p1 / p2 were given in. Here that is entering from the left of the door.
 const { forward, backward } = counter.getLineCount("door");
-const occupancy = forward - backward; // net inside, if forward is the entering direction
+const occupancy = forward - backward; // net inside
+```
+
+### One forward policy for every line on screen
+
+```ts
+// The first direction that is NOT parallel to the line wins. Two directions that
+// are not parallel to each other therefore cover every possible line, so lines the
+// user draws at any angle all resolve deterministically.
+const FORWARD = [
+  { x: -1, y: -1 }, // top-left is forward
+  { x: 0, y: -1 },  // ...except on an exactly top-left/bottom-right line: up
+];
+
+const lines: Line[] = drawn.map((l) => ({ ...l, forwardDirection: FORWARD }));
+```
+
+Omitting `forwardDirection` applies `DEFAULT_FORWARD_DIRECTION` — rightward, or
+downward for a horizontal line.
+
+### Flip one line's direction
+
+```ts
+import { reverseDirection } from "@pj-hoakari/web-crowd-detection-utils/line-crossing";
+
+// forwardDirection is per line, so reversing one leaves the others alone.
+// reverseDirection() with no argument reverses DEFAULT_FORWARD_DIRECTION, which
+// covers lines that never set a direction of their own.
+const lines: Line[] = drawn.map((l) => ({
+  ...l,
+  forwardDirection: flipped.has(l.id)
+    ? reverseDirection(l.forwardDirection)
+    : l.forwardDirection,
+}));
+```
+
+The new direction applies from the next frame on; counts accumulated before the
+flip stay as they were — see the two direction failure modes below.
+
+### Draw the forward side
+
+```ts
+import { forwardNormal } from "@pj-hoakari/web-crowd-detection-utils/line-crossing";
+
+// Unit normal pointing at the side counted as forward. Use it instead of
+// re-deriving the direction, so the overlay cannot disagree with the tally.
+const n = forwardNormal(line);
+const midX = (line.p1.x + line.p2.x) / 2;
+const midY = (line.p1.y + line.p2.y) / 2;
+ctx.moveTo(midX, midY);
+ctx.lineTo(midX + n.x * 32, midY + n.y * 32);
 ```
 
 ### Read every line at once
@@ -223,27 +284,84 @@ With assist off, a tracker ID switch at the line (track lost on one side, a new 
 
 Source: src/line-crossing/counter.ts (rescue / cooldown), src/line-crossing/constants.ts
 
-### MEDIUM Assuming forward always means left-to-right
+### MEDIUM Leaving a semantic direction implicit
 
 Wrong:
 
 ```ts
-// Assuming forward is always the "in" direction regardless of how p1/p2 were set
+// Without forwardDirection the default applies — rightward, or downward for a
+// horizontal line. That is stable, but it is geometry, not "entering".
 const entering = counter.getLineCount("door").forward;
 ```
 
 Correct:
 
 ```ts
-// Direction follows YOUR p1→p2 order. Confirm which side is "in" for the line's
-// orientation (or normalize p1/p2 so forward consistently means entering).
+const lines = [{
+  id: "door",
+  p1: { x: 320, y: 0 },
+  p2: { x: 320, y: 480 },
+  forwardDirection: { x: 1, y: 0 }, // any non-zero vector toward the intended direction
+}];
+counter.update(points, lines);
 const { forward, backward } = counter.getLineCount("door");
-const entering = forward; // only after verifying the p1→p2 orientation
+const entering = forward;
 ```
 
-`forward` / `backward` are defined by the side transition relative to the directed line `p1`→`p2` (the sign of the 2-D cross product), not by screen left/right. Swapping a line's `p1` and `p2` flips the two directions.
+`forwardDirection` names the direction that counts as `forward` — `{ x: -1, y: -1 }` for "toward the top-left", say. Only its component perpendicular to the line matters, so swapping `p1` and `p2` never flips the tally, and no reference point has to sit on the line. Omitting it is not an error; it just means the tally follows `DEFAULT_FORWARD_DIRECTION` (rightward, downward for a horizontal line) rather than anything the scene implies.
 
-Source: src/line-crossing/counter.ts (sideOf sign → forward/backward), src/line-crossing/types.ts (LineCount)
+Source: src/line-crossing/direction.ts (forwardDirection → side), src/line-crossing/types.ts:40-68 (Line.forwardDirection), src/line-crossing/constants.ts:12-15 (DEFAULT_FORWARD_DIRECTION)
+
+### MEDIUM A forwardDirection parallel to its line resolves nothing
+
+Wrong:
+
+```ts
+// One direction along the lines' own orientation — resolves no side for them
+const lines: Line[] = drawn.map((l) => ({
+  ...l,
+  forwardDirection: { x: -1, y: -1 },
+}));
+```
+
+Correct:
+
+```ts
+// Ordered fallback: the first entry NOT parallel to the line wins, so two
+// directions that are not parallel to each other cover every possible line.
+const FORWARD = [
+  { x: -1, y: -1 }, // top-left is forward
+  { x: 0, y: -1 },  // ...except on an exactly top-left/bottom-right line: up
+];
+const lines: Line[] = drawn.map((l) => ({ ...l, forwardDirection: FORWARD }));
+```
+
+A direction parallel to the line points at no side, so `DEFAULT_FORWARD_DIRECTION` silently decides instead — and `reverseDirection` becomes a no-op there, because neither the original nor the reversed list resolves a side. The same sensitivity makes a single near-parallel preference unstable: with `{ x: -1, y: -1 }`, lines at 44° and 46° end up with opposite forward sides.
+
+Source: src/line-crossing/direction.ts:29-69 (resolveSide / forwardSideOf fallback), :119-155 (reverseDirection @remarks)
+
+### MEDIUM Expecting a changed forwardDirection to re-tally past crossings
+
+Wrong:
+
+```ts
+// Flip the line, then read the totals as if they were all under the new policy
+line.forwardDirection = reverseDirection(line.forwardDirection);
+const { forward, backward } = counter.getLineCount(line.id); // still mixed
+```
+
+Correct:
+
+```ts
+// Decide explicitly: keep the history (and label it as pre-flip), or zero the
+// tally for the flipped line only. Prev-point state is untouched either way.
+line.forwardDirection = reverseDirection(line.forwardDirection);
+counter.removeLine(line.id); // or counter.resetCounts() to zero every line
+```
+
+`forwardDirection` is read on each `update` call, so a flip applies from the next frame on and the crossings already tallied keep the old convention — one tally then mixes both, with nothing to signal it.
+
+Source: src/line-crossing/counter.ts:112-137 (update @param lines), :245-252 (resetCounts / removeLine clear counts only)
 
 ### HIGH Tension: crossing accuracy vs tracker ID stability
 

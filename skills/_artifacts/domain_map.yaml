@@ -21,6 +21,13 @@
 #   failure modes + covers/tasks to set-up-onnx-runtime (one cross-tagged to
 #   set-up-detection-pipeline) and a self-host-vs-zero-config tension. Library still
 #   at 0.0.0 (package.json unchanged), so version fields are unchanged.
+# Revision: 2026-08-04 diff-audit pass — reconciled with the configurable
+#   line direction (commits b173f98, e71e428): Line.forwardDirection, the new
+#   src/line-crossing/direction.ts (forwardNormal, reverseDirection) and
+#   DEFAULT_FORWARD_DIRECTION. Rewrote the count-line-crossings direction failure
+#   mode (forward no longer follows p1→p2 order) and added 2 more (parallel
+#   direction silently falls back; a mid-stream direction change does not re-tally).
+#   Library still at 0.0.0 (package.json unchanged), so version fields are unchanged.
 
 library:
   name: "@pj-hoakari/web-crowd-detection-utils"
@@ -47,7 +54,7 @@ domains:
     description: "Reducing false positives on static scenery by attenuating the confidence of detections that don't move, via the detector-agnostic EMA background model. Sits between detection and tracking, operating on its own ScoredBox in background-model pixel space."
   - name: "Line-crossing counting"
     slug: "line-crossing-counting"
-    description: "Counting tracked objects that cross virtual lines, with per-direction tallies, via the detector- and tracker-agnostic LineCrossingCounter. A post-tracking stage that operates on caller-anchored points in a coordinate space shared with the lines; drawing is out of scope."
+    description: "Counting tracked objects that cross virtual lines, with per-direction tallies, via the detector- and tracker-agnostic LineCrossingCounter. A post-tracking stage that operates on caller-anchored points in a coordinate space shared with the lines; which side counts as forward is configured per line (Line.forwardDirection), independently of endpoint order. Drawing is out of scope, but forwardNormal exposes the resolved side so an overlay cannot disagree with the tally."
 
 skills:
   - name: "Set up a YOLO detection pipeline"
@@ -762,11 +769,13 @@ skills:
   - name: "Count tracked objects crossing virtual lines"
     slug: "count-line-crossings"
     domain: "line-crossing-counting"
-    description: "Tally how many tracked objects cross each virtual line, per direction, with LineCrossingCounter. A post-tracking stage: the caller reduces each tracked detection to an anchor point (e.g. foot) and passes { trackId, point } plus the lines (each defined by its two anchor endpoints). Detector- and tracker-agnostic, stateful, no drawing. Optional crossing-assist (rescue / cooldown) compensates for tracker ID churn."
+    description: "Tally how many tracked objects cross each virtual line, per direction, with LineCrossingCounter. A post-tracking stage: the caller reduces each tracked detection to an anchor point (e.g. foot) and passes { trackId, point } plus the lines (each defined by its two anchor endpoints and, when a semantic direction is needed, the direction that counts as forward). Detector- and tracker-agnostic, stateful, no drawing. Optional crossing-assist (rescue / cooldown) compensates for tracker ID churn."
     type: "core"
     covers:
       - "LineCrossingCounter (update, getLineCount, getAllCounts, reset, resetCounts, clearPositions, removeLine)"
-      - "Line { id, p1, p2 } (two anchor endpoints), Point, TrackedPoint { trackId, point }, LineCount { forward, backward }"
+      - "Line { id, p1, p2, forwardDirection? } (two anchor endpoints + optional forward policy), Point, Vector, TrackedPoint { trackId, point }, LineCount { forward, backward }"
+      - "Line.forwardDirection: a single Vector or an ordered Vector[] whose first entry not parallel to the line wins; falls back to DEFAULT_FORWARD_DIRECTION (rightward, downward for a horizontal line)"
+      - "forwardNormal(line) — unit normal pointing at the side counted as forward, for overlays; reverseDirection(directions?) — the opposite policy, for a per-line flip toggle"
       - "Crossing test: side-of-line (2-D cross product) + segment intersection"
       - "Statefulness: one instance per stream, prev-point comparison, caller-computed anchor"
       - "Shared coordinate space (counter does no scaling)"
@@ -774,6 +783,9 @@ skills:
     tasks:
       - "Count people crossing an entry/exit line (in/out) on a tracked stream"
       - "Add line-crossing counting after createYoloDetector + BYTETracker"
+      - "Fix which side counts as forward with forwardDirection, independently of how p1 / p2 were ordered"
+      - "Apply one forward policy to every user-drawn line, at any angle"
+      - "Flip a single line's direction with reverseDirection, and draw the resolved side with forwardNormal"
       - "Enable crossing-assist to survive tracker ID switches at the line"
       - "Reset counts / positions when switching sources or clips"
     failure_modes:
@@ -861,17 +873,58 @@ skills:
         source: "src/line-crossing/counter.ts (rescue / cooldown), src/line-crossing/constants.ts, maintainer interview (Q3)"
         priority: "MEDIUM"
         status: "active"
-      - mistake: "Assuming forward always means left-to-right"
-        mechanism: "forward / backward are defined by the side transition relative to the directed line p1→p2 (the sign of the 2-D cross product), not by screen left/right. Swapping a line's p1 and p2 flips forward and backward, so an agent that hard-codes 'forward = entering' mislabels direction for some line orientations."
+      - mistake: "Leaving a semantic direction implicit"
+        mechanism: "Omitting Line.forwardDirection applies DEFAULT_FORWARD_DIRECTION — rightward, or downward for a horizontal line. That is stable and independent of p1 / p2 order, but it is a geometric default, not 'entering'. An agent that reads forward as the in-direction without setting the policy mislabels in/out for any line whose entering side is not the default one."
         wrong_pattern: |
-          // Assuming forward is always the 'in' direction regardless of p1/p2 order
+          // No forwardDirection — the default (rightward) applies, not "entering"
+          const lines = [{ id: "door", p1: { x: 320, y: 0 }, p2: { x: 320, y: 480 } }];
+          counter.update(points, lines);
           const entering = counter.getLineCount("door").forward;
         correct_pattern: |
-          // Direction follows how YOU set p1/p2. Verify which side is "in" for your
-          // line orientation (or normalize p1/p2 so forward consistently = entering).
-          const { forward, backward } = counter.getLineCount("door");
-          const entering = forward; // only after confirming the p1→p2 orientation
-        source: "src/line-crossing/counter.ts (sideOf sign → forward/backward), src/line-crossing/types.ts (LineCount doc)"
+          // Name the direction that means "entering" for THIS line; any non-zero
+          // vector pointing that way works (only its perpendicular part matters).
+          const lines = [{
+            id: "door",
+            p1: { x: 320, y: 0 },
+            p2: { x: 320, y: 480 },
+            forwardDirection: { x: 1, y: 0 },
+          }];
+          counter.update(points, lines);
+          const entering = counter.getLineCount("door").forward;
+        source: "src/line-crossing/direction.ts (forwardSideOf), src/line-crossing/types.ts:40-68 (Line.forwardDirection), src/line-crossing/constants.ts:12-15 (DEFAULT_FORWARD_DIRECTION)"
+        priority: "MEDIUM"
+        status: "active"
+        version_context: "Before commit b173f98 forward / backward followed the p1→p2 endpoint order (sign of the 2-D cross product), so swapping p1 and p2 flipped the tally. Endpoint order is now irrelevant; agents carrying the old model normalize p1 / p2 instead of setting forwardDirection."
+      - mistake: "A forwardDirection parallel to its line silently falls back to the default"
+        mechanism: "Only the component perpendicular to the line selects a side, so a direction parallel to the line resolves nothing and DEFAULT_FORWARD_DIRECTION decides instead — with no error. The same rule makes reverseDirection a no-op on such a line (neither the original nor the reversed list resolves a side, both fall through to the default), and it makes a single near-parallel preference unstable: with { x: -1, y: -1 }, lines at 44° and 46° get opposite forward sides. An ordered list fixes this — the first entry not parallel to the line wins, so any two directions not parallel to EACH OTHER cover every possible line."
+        wrong_pattern: |
+          // A single direction along the line's own orientation — resolves no side
+          const lines = drawn.map((l) => ({
+            ...l,
+            forwardDirection: { x: -1, y: -1 }, // 44° vs 46° lines end up opposite
+          }));
+        correct_pattern: |
+          // Ordered fallback: first entry not parallel to the line wins.
+          const FORWARD = [
+            { x: -1, y: -1 }, // top-left is forward
+            { x: 0, y: -1 },  // ...except on an exact top-left/bottom-right line: up
+          ];
+          const lines = drawn.map((l) => ({ ...l, forwardDirection: FORWARD }));
+        source: "src/line-crossing/direction.ts:29-69 (resolveSide / forwardSideOf fallback), :119-155 (reverseDirection @remarks), src/line-crossing/types.ts:45-56"
+        priority: "MEDIUM"
+        status: "active"
+      - mistake: "Expecting a changed forwardDirection to re-tally past crossings"
+        mechanism: "forwardDirection is read per update() call, so flipping a line mid-stream (a UI toggle via reverseDirection) applies from the next frame on. Counts already accumulated under the old policy stay as they were, so an agent that flips a line and reads getLineCount immediately sees a mix of both conventions in one tally."
+        wrong_pattern: |
+          // Flip the line, then read the totals as if they were all under the new policy
+          line.forwardDirection = reverseDirection(line.forwardDirection);
+          const { forward, backward } = counter.getLineCount(line.id); // still mixed
+        correct_pattern: |
+          // Decide explicitly: keep the history (and label it), or zero the tally
+          // for the flipped line only. Prev-point state is untouched either way.
+          line.forwardDirection = reverseDirection(line.forwardDirection);
+          counter.removeLine(line.id); // or resetCounts() to zero every line
+        source: "src/line-crossing/counter.ts:112-137 (update @param lines — a mid-stream forwardDirection applies only to later frames), :187 (forwardSideOf at count time), :245-252 (resetCounts / removeLine clear counts only)"
         priority: "MEDIUM"
         status: "active"
 

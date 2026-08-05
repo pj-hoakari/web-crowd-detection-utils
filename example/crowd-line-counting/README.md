@@ -18,7 +18,7 @@
 | `source` | レターボックスキャプチャ（`createLetterboxCapturer`）と逆変換（`reverseLetterboxBoxes`） |
 | `background` | `BackgroundSubtractor` で静止領域の検出を抑制（トグル可能） |
 | `bytetrack` | `BYTETracker` で安定した track ID を付与 |
-| `line-crossing` | `LineCrossingCounter` でライン通過を方向別に集計 |
+| `line-crossing` | `LineCrossingCounter` でライン通過を方向別に集計。`forward` 側の描画は `forwardNormal()`、反転は `reverseDirection()` |
 
 ## パイプライン（`src/worker.ts`）
 
@@ -52,9 +52,12 @@
 
 - 動画を読み込むと、水平中央に縦のラインが既定で配置される
 - **Draw line** を押し、キャンバス上を2点クリックするとラインを引き直せる（1点目クリック→マウス移動でプレビュー→2点目クリックで確定）
-- ラインの**緑の矢印**が `forward` 側を示す
-  `forward` / `backward` はライン描画方向（p1→p2）基準であり、画面の左右ではない
-  向きを反転したい場合は端点を逆順に引き直す
+- ラインの**緑の矢印**が `forward` 側を示す（矢印はライブラリの `forwardNormal()` が返す法線をそのまま描いているので、カウントと必ず一致する）
+  `forward` / `backward` は `Line.forwardDirection` で指定した方向を基準にするため、端点をクリックした順序では変化しない
+  このサンプルは `[{ x: 1, y: 0 }, { x: 0, y: 1 }]` を指定し、右側（右で決まらない水平ラインでは下側）を `forward` としている
+  リストの先頭からラインに平行でない最初の方向が採用されるため、45° のラインでも向きが揺れない
+- **Flip direction** で `forward` 側を反転（`reverseDirection()` でベクトルを反転させるだけで、端点は動かさない）
+  反転前のカウントは旧方向で計上されたもので意味が混ざるため、ライン引き直しと同様にカウントをゼロに戻している
 - **Reset counts** でカウントのみをゼロに、**Clear line** でラインを削除
 
 ## トグル

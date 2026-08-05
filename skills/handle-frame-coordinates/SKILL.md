@@ -11,9 +11,10 @@ description: >
   / OffscreenCanvas), the CaptureCanvas return type (capturers run in Web Workers
   via OffscreenCanvas — narrow capturer.canvas with instanceof before
   captureStream()), and per-call params re-evaluation.
-type: core
-library: web-crowd-detection-utils
-library_version: "0.0.0"
+metadata:
+  type: core
+  library: web-crowd-detection-utils
+  library_version: "0.0.0"
 sources:
   - "pj-hoakari/web-crowd-detection-utils:src/source/letterbox.ts"
   - "pj-hoakari/web-crowd-detection-utils:src/source/capture.ts"
