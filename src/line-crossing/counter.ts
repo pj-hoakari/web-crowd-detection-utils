@@ -3,6 +3,7 @@ import {
 	DEFAULT_RESCUE_DISTANCE,
 	DEFAULT_RESCUE_FRAMES,
 } from "./constants";
+import { crossSign, forwardSideOf } from "./direction";
 import type {
 	CrossingAssistConfig,
 	Line,
@@ -12,21 +13,19 @@ import type {
 } from "./types";
 
 /**
- * Signed side of `p` relative to the directed line `p1`→`p2`: the sign of the
- * 2-D cross product `(p2 − p1) × (p − p1)`. Returns `1` / `-1` for the two
+ * Signed side of `p` relative to the line through `p1` and `p2`: the sign of
+ * the 2-D cross product `(p2 − p1) × (p − p1)`. Returns `1` / `-1` for the two
  * sides and `0` when `p` is collinear with the line.
  *
  * @internal
  */
 function sideOf(line: Line, p: Point): number {
-	const dx = line.p2.x - line.p1.x;
-	const dy = line.p2.y - line.p1.y;
-	const ex = p.x - line.p1.x;
-	const ey = p.y - line.p1.y;
-	const cross = dx * ey - dy * ex;
-	if (cross > 0) return 1;
-	if (cross < 0) return -1;
-	return 0;
+	return crossSign(
+		line.p2.x - line.p1.x,
+		line.p2.y - line.p1.y,
+		p.x - line.p1.x,
+		p.y - line.p1.y,
+	);
 }
 
 /**
@@ -87,7 +86,12 @@ interface LostEntry {
  * import { LineCrossingCounter } from "@pj-hoakari/web-crowd-detection-utils/line-crossing";
  *
  * const counter = new LineCrossingCounter();
- * const lines = [{ id: "door", p1: { x: 10, y: 0 }, p2: { x: 10, y: 480 } }];
+ * const lines = [{
+ *   id: "door",
+ *   p1: { x: 10, y: 0 },
+ *   p2: { x: 10, y: 480 },
+ *   forwardDirection: { x: 1, y: 0 }, // rightward crossings count as forward
+ * }];
  *
  * // Per frame, after tracking. The caller picks each detection's anchor point.
  * const points = tracked.map((t) => ({
@@ -112,15 +116,18 @@ export class LineCrossingCounter {
 	 * A crossing is counted for a `(track, line)` pair when, between the track's
 	 * previous and current point, (1) the {@link sideOf | side} of the line
 	 * flips (neither endpoint is collinear) **and** (2) the prev→current segment
-	 * actually intersects the line's `p1`–`p2` segment. The direction follows
-	 * the side transition: negative→positive increments `forward`, otherwise
-	 * `backward`.
+	 * actually intersects the line's `p1`–`p2` segment. A crossing onto the side
+	 * {@link Line.forwardDirection} points at counts as `forward`, the other as
+	 * `backward`; endpoint order is irrelevant, so re-supplying a line with `p1`
+	 * and `p2` swapped never flips the tally.
 	 *
 	 * @param points - The tracked objects this frame, each reduced to an anchor
 	 *   {@link Point}. A track with no entry last frame produces no count (it has
 	 *   no previous point), unless rescued via {@link CrossingAssistConfig}.
 	 * @param lines - The counting lines, in the same coordinate space as
-	 *   `points`. May change between frames; counts persist per {@link Line.id}.
+	 *   `points`. May change between frames; counts persist per {@link Line.id},
+	 *   so a {@link Line.forwardDirection} changed mid-stream applies only to
+	 *   later frames and leaves the crossings already tallied as they were.
 	 * @param options - Optional crossing-assist tuning. When
 	 *   `options.assist.enabled` is falsy (the default), assist state is cleared
 	 *   and only raw side-change counting runs.
@@ -177,7 +184,7 @@ export class LineCrossingCounter {
 					if (sPrev === sNow) continue;
 					if (!segmentsIntersect(prev, point, line.p1, line.p2)) continue;
 					const c = this.counts.get(line.id) ?? { forward: 0, backward: 0 };
-					if (sPrev < 0 && sNow > 0) {
+					if (sNow === forwardSideOf(line)) {
 						c.forward += 1;
 					} else {
 						c.backward += 1;

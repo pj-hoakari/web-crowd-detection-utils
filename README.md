@@ -58,7 +58,7 @@ This package ships agent skills under `skills/`. If you use an AI coding agent (
 npx @tanstack/intent@latest install
 ```
 
-This wires the skills into your agent config so it loads the right SKILL.md (detection-pipeline setup, postprocess tuning, ByteTrack integration, static-detection suppression, etc.) when you ask for help with this library.
+This wires the skills into your agent config so it loads the right SKILL.md (detection-pipeline setup, postprocess tuning, ByteTrack integration, static-detection suppression, line-crossing counting, etc.) when you ask for help with this library.
 
 To browse the available skills:
 

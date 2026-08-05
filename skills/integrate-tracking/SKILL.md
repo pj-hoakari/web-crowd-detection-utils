@@ -9,9 +9,10 @@ description: >
   ↔ Observation structural compatibility (no remap), 3-stage cascade,
   TrackState lifecycle, BYTETrackerOptions thresholds, and the pass-through
   generic that preserves classId on TrackedBox.
-type: core
-library: web-crowd-detection-utils
-library_version: "0.0.0"
+metadata:
+  type: core
+  library: web-crowd-detection-utils
+  library_version: "0.0.0"
 sources:
   - "pj-hoakari/web-crowd-detection-utils:src/bytetrack/tracker.ts"
   - "pj-hoakari/web-crowd-detection-utils:src/bytetrack/types.ts"

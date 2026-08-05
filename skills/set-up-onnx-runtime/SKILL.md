@@ -14,9 +14,10 @@ description: >
   process-global singleton), Worker compatibility (every subpath runs in a Web
   Worker — the source capturers use OffscreenCanvas — so only consumer-side
   captureStream() needs the main thread), and dynamic-import SSR safety.
-type: core
-library: web-crowd-detection-utils
-library_version: "0.0.0"
+metadata:
+  type: core
+  library: web-crowd-detection-utils
+  library_version: "0.0.0"
 sources:
   - "pj-hoakari/web-crowd-detection-utils:src/onnx/session.ts"
   - "pj-hoakari/web-crowd-detection-utils:src/onnx/preprocess.ts"

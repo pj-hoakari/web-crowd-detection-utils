@@ -26,7 +26,8 @@
 		"dist",
 		"README.md",
 		"LICENSE",
-		"skills"
+		"skills",
+		"!skills/_artifacts"
 	],
 	"bin": {
 		"wcdu-copy-runtime-assets": "./dist/bin/copy-runtime-assets.js"

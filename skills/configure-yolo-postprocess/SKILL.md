@@ -8,9 +8,10 @@ description: >
   detection ceiling. Covers postprocess() and nms() low-level entry points,
   sigmoid auto-detection in standard formats, and the dispatchAuto heuristic
   limits documented as failure modes.
-type: core
-library: web-crowd-detection-utils
-library_version: "0.0.0"
+metadata:
+  type: core
+  library: web-crowd-detection-utils
+  library_version: "0.0.0"
 sources:
   - "pj-hoakari/web-crowd-detection-utils:src/yolo/postprocess.ts"
   - "pj-hoakari/web-crowd-detection-utils:src/yolo/nms.ts"

@@ -10,6 +10,17 @@ export interface Point {
 }
 
 /**
+ * A direction in the coordinate space shared by the counting lines and the
+ * tracked points. Only its orientation matters; the magnitude is ignored.
+ */
+export interface Vector {
+	/** Horizontal component; positive points right. */
+	x: number;
+	/** Vertical component; positive points down in a canvas / image space. */
+	y: number;
+}
+
+/**
  * A counting line, defined by its two anchor endpoints {@link Line.p1} and
  * {@link Line.p2}. A tracked point crosses the line when the segment between
  * its previous and current position intersects the `p1`–`p2` segment.
@@ -22,28 +33,55 @@ export interface Point {
 export interface Line {
 	/** Stable identifier; crossing counts are accumulated per `id`. */
 	id: string;
-	/** First anchor endpoint of the line. */
+	/** One anchor endpoint. Its order relative to {@link Line.p2} never affects the direction counts. */
 	p1: Point;
-	/** Second anchor endpoint of the line. */
+	/** The other anchor endpoint. Its order relative to {@link Line.p1} never affects the direction counts. */
 	p2: Point;
+	/**
+	 * The direction that counts as `forward`, in the shared coordinate space —
+	 * `{ x: -1, y: -1 }` for "toward the top-left", say. Defaults to
+	 * {@link DEFAULT_FORWARD_DIRECTION}.
+	 *
+	 * @remarks
+	 * The side the direction points at is what is counted, so only its component
+	 * perpendicular to the line matters, and swapping `p1` and `p2` leaves the
+	 * tally untouched. A direction *parallel* to the line points at no side; pass
+	 * an ordered list to decide that case yourself — the first entry that is not
+	 * parallel to the line wins. Any two directions that are not parallel to
+	 * *each other* therefore cover every possible line. If they all turn out to
+	 * be parallel, {@link DEFAULT_FORWARD_DIRECTION} resolves the side.
+	 *
+	 * Near-parallel lines are inherently sensitive: with a single `{ x: -1, y: -1 }`
+	 * preference, lines at 44° and 46° get opposite forward sides. Prefer a
+	 * direction well clear of the orientations your lines actually take.
+	 *
+	 * @example
+	 * One screen-wide policy applied to every line:
+	 * ```ts
+	 * const FORWARD = [
+	 *   { x: -1, y: -1 }, // top-left is forward
+	 *   { x: 0, y: -1 },  // ...but for an exactly top-left/bottom-right line, up is
+	 * ];
+	 * const lines = drawn.map((l) => ({ ...l, forwardDirection: FORWARD }));
+	 * ```
+	 */
+	forwardDirection?: Vector | readonly Vector[];
 }
 
-/** Direction of a crossing relative to a line's `p1`→`p2` orientation. */
+/** Direction of a crossing relative to a line's {@link Line.forwardDirection}. */
 export type CrossingDirection = "forward" | "backward";
 
 /**
- * Per-line crossing tally. The two directions are distinguished by the side
- * transition relative to the line's `p1`→`p2` orientation; see
- * {@link LineCrossingCounter.update}.
+ * Per-line crossing tally, split by which side of the line the track ended up
+ * on; see {@link LineCrossingCounter.update}.
  */
 export interface LineCount {
 	/**
-	 * Crossings from the negative side to the positive side of the directed line
-	 * `p1`→`p2`, where the side is the sign of the 2-D cross product
-	 * `(p2 − p1) × (point − p1)`.
+	 * Crossings onto the side {@link Line.forwardDirection} points at — the side
+	 * {@link forwardNormal} returns.
 	 */
 	forward: number;
-	/** Crossings in the opposite direction (positive side to negative side). */
+	/** Crossings onto the opposite side. */
 	backward: number;
 }
 

@@ -8,9 +8,10 @@ description: >
   sizing inputSize, or wiring detect() into a requestAnimationFrame loop.
   Covers the happy path through @pj-hoakari/web-crowd-detection-utils/yolo
   and /onnx and /source subpaths.
-type: core
-library: web-crowd-detection-utils
-library_version: "0.0.0"
+metadata:
+  type: core
+  library: web-crowd-detection-utils
+  library_version: "0.0.0"
 sources:
   - "pj-hoakari/web-crowd-detection-utils:src/yolo/detector.ts"
   - "pj-hoakari/web-crowd-detection-utils:src/yolo/index.ts"
