@@ -174,8 +174,8 @@ importers:
         specifier: 2.5.15
         version: 2.5.15
       '@tanstack/intent':
-        specifier: 0.3.8
-        version: 0.3.8
+        specifier: 0.5.0
+        version: 0.5.0
       '@vitest/coverage-v8':
         specifier: 5.0.3
         version: 5.0.3(vitest@5.0.3)
@@ -606,8 +606,9 @@ packages:
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
 
-  '@tanstack/intent@0.3.8':
-    resolution: {integrity: sha512-5KXhk+dPqzVHcETuf0Q6l1jasjFS2BJvG4Vw1dakuHEaQ85kZ3oSsOMROsad5w/DsEsQ9q1F00cQzIrk9jPzsQ==}
+  '@tanstack/intent@0.5.0':
+    resolution: {integrity: sha512-27zOOpQLfBTM5cQjqkASf6JH3jggMwr29UhK8dlAI1WP9rjzywJ87/I6meiH/khyPIFNRluh9Q8wlIVrpN4Jpg==}
+    engines: {node: '>=20.12.0'}
     hasBin: true
 
   '@types/chai@5.2.3':
@@ -958,10 +959,6 @@ packages:
     resolution: {integrity: sha512-nEh+kZOPY1w+gcCMobZ6ETUp9WfibndnosbpwB1iJk/8Gt5ZF2bhS6+B6bPYz424KtwsR6Rflc3tCz1/ghX2dQ==}
     engines: {node: '>=4.0'}
 
-  cac@6.7.14:
-    resolution: {integrity: sha512-b6Ilus+c3RrdDk+JhLKUAQfzzgLEPy6wcXqS7f/xe1EETvsDP6GORG7SFuOs6cID5YkqchW/LXZbX5bc8j7ZcQ==}
-    engines: {node: '>=8'}
-
   cac@7.0.0:
     resolution: {integrity: sha512-tixWYgm5ZoOD+3g6UTea91eow5z6AAHaho3g0V9CNSNb45gM8SmflpAc+GRd1InC4AqN/07Unrgp56Y94N9hJQ==}
     engines: {node: '>=20.19.0'}
@@ -1044,9 +1041,6 @@ packages:
 
   js-tokens@10.0.0:
     resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
-
-  jsonc-parser@3.3.1:
-    resolution: {integrity: sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==}
 
   lightningcss-android-arm64@1.33.0:
     resolution: {integrity: sha512-gEpRTalKdosp4Bb8qWtc2iOgE5SeIHlpS1up9bFq2wAyYhl1UdTObYiHe98zEM9SQvSoqQZ1IQD0JNpg3Ml5pg==}
@@ -1210,11 +1204,6 @@ packages:
 
   scheduler@0.28.0:
     resolution: {integrity: sha512-juorfCmIkIw8tT+p5BXSm6PJjQF/ycEYmKyzURCIt/RaZIhL+PulbQ9Yu2z1HdOJDdqDTlxA1+xKBmHXJsczAw==}
-
-  semver@7.8.5:
-    resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
-    engines: {node: '>=10'}
-    hasBin: true
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -1595,13 +1584,7 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.1': {}
 
-  '@tanstack/intent@0.3.8':
-    dependencies:
-      cac: 6.7.14
-      jsonc-parser: 3.3.1
-      semver: 7.8.5
-      std-env: 4.2.0
-      yaml: 2.9.0
+  '@tanstack/intent@0.5.0': {}
 
   '@types/chai@5.2.3':
     dependencies:
@@ -1823,8 +1806,6 @@ snapshots:
     dependencies:
       '@types/node': 24.13.4
 
-  cac@6.7.14: {}
-
   cac@7.0.0: {}
 
   chai@6.2.2: {}
@@ -1882,8 +1863,6 @@ snapshots:
   import-without-cache@0.4.0: {}
 
   js-tokens@10.0.0: {}
-
-  jsonc-parser@3.3.1: {}
 
   lightningcss-android-arm64@1.33.0:
     optional: true
@@ -2056,8 +2035,6 @@ snapshots:
 
   scheduler@0.28.0: {}
 
-  semver@7.8.5: {}
-
   source-map-js@1.2.1: {}
 
   std-env@4.2.0: {}
@@ -2186,7 +2163,8 @@ snapshots:
 
   ws@8.21.3: {}
 
-  yaml@2.9.0: {}
+  yaml@2.9.0:
+    optional: true
 
   yuku-ast@0.9.5:
     dependencies:
