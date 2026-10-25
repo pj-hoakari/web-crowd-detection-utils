@@ -1,31 +1,33 @@
 ---
+
 name: count-line-crossings
 description: >
-  Count how many tracked objects cross each virtual line, per direction, with
-  LineCrossingCounter. Load when an agent counts people entering / exiting across
-  a line, adds in/out counting after BYTETracker, calls update / getLineCount /
-  getAllCounts / reset / resetCounts / clearPositions, defines lines by two anchor
-  endpoints plus an optional forward direction
-  { id, p1, p2, forwardDirection }, draws that direction with forwardNormal,
-  flips a line's direction with reverseDirection, or
-  tunes crossing-assist (rescueDistance / rescueFrames / cooldownFrames). Covers
-  caller-anchored TrackedPoint { trackId, point } input
-  (the counter never reads boxes), the side-of-line + segment-intersection crossing
-  test, statefulness (one instance per stream), the shared-coordinate-space
-  requirement (no scaling), forward/backward direction configured independently of
-  endpoint order (single Vector or ordered Vector[] fallback,
-  DEFAULT_FORWARD_DIRECTION), and rescue / cooldown ID-churn assist.
+Count how many tracked objects cross each virtual line, per direction, with
+LineCrossingCounter. Load when an agent counts people entering / exiting across
+a line, adds in/out counting after BYTETracker, calls update / getLineCount /
+getAllCounts / reset / resetCounts / clearPositions, defines lines by two anchor
+endpoints plus an optional forward direction
+{ id, p1, p2, forwardDirection }, draws that direction with forwardNormal,
+flips a line's direction with reverseDirection, or
+tunes crossing-assist (rescueDistance / rescueFrames / cooldownFrames). Covers
+caller-anchored TrackedPoint { trackId, point } input
+(the counter never reads boxes), the side-of-line + segment-intersection crossing
+test, statefulness (one instance per stream), the shared-coordinate-space
+requirement (no scaling), forward/backward direction configured independently of
+endpoint order (single Vector or ordered Vector[] fallback,
+DEFAULT_FORWARD_DIRECTION), and rescue / cooldown ID-churn assist.
 metadata:
-  type: core
-  library: web-crowd-detection-utils
-  library_version: "0.0.0"
+type: core
+library: web-crowd-detection-utils
+library_version: "0.0.0"
 sources:
-  - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/counter.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/direction.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/types.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/constants.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/index.ts"
-  - "pj-hoakari/web-crowd-detection-utils:CLAUDE.md"
+- "pj-hoakari/web-crowd-detection-utils:src/line-crossing/counter.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/line-crossing/direction.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/line-crossing/types.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/line-crossing/constants.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/line-crossing/index.ts"
+- "pj-hoakari/web-crowd-detection-utils:CLAUDE.md"
+
 ---
 
 # Count tracked objects crossing virtual lines
@@ -40,27 +42,29 @@ import type { Line } from "@pj-hoakari/web-crowd-detection-utils/line-crossing";
 
 const counter = new LineCrossingCounter(); // one instance, lives across all frames
 // Lines in the SAME coordinate space as the points fed below (here: source space).
-const lines: Line[] = [{
-  id: "door",
-  p1: { x: 320, y: 0 },
-  p2: { x: 320, y: 480 },
-  forwardDirection: { x: 1, y: 0 }, // crossings toward the right count as forward
-}];
+const lines: Line[] = [
+	{
+		id: "door",
+		p1: { x: 320, y: 0 },
+		p2: { x: 320, y: 480 },
+		forwardDirection: { x: 1, y: 0 }, // crossings toward the right count as forward
+	},
+];
 
 while (!signal.aborted) {
-  const { imageData, params } = capturer.capture(video);
-  const dets = await detector.detect(imageData);
-  const inSource = reverseLetterboxBoxes(dets, params);
-  const tracked = tracker.update(inSource);            // stable trackIds, source space
+	const { imageData, params } = capturer.capture(video);
+	const dets = await detector.detect(imageData);
+	const inSource = reverseLetterboxBoxes(dets, params);
+	const tracked = tracker.update(inSource); // stable trackIds, source space
 
-  // Reduce each tracked box to its anchor point (foot = bottom-center).
-  const points = tracked.map((t) => ({
-    trackId: t.trackId,
-    point: { x: (t.x1 + t.x2) / 2, y: t.y2 },
-  }));
-  counter.update(points, lines, { assist: { enabled: true } });
+	// Reduce each tracked box to its anchor point (foot = bottom-center).
+	const points = tracked.map((t) => ({
+		trackId: t.trackId,
+		point: { x: (t.x1 + t.x2) / 2, y: t.y2 },
+	}));
+	counter.update(points, lines, { assist: { enabled: true } });
 
-  const { forward, backward } = counter.getLineCount("door");
+	const { forward, backward } = counter.getLineCount("door");
 }
 ```
 
@@ -82,8 +86,8 @@ const occupancy = forward - backward; // net inside
 // are not parallel to each other therefore cover every possible line, so lines the
 // user draws at any angle all resolve deterministically.
 const FORWARD = [
-  { x: -1, y: -1 }, // top-left is forward
-  { x: 0, y: -1 },  // ...except on an exactly top-left/bottom-right line: up
+	{ x: -1, y: -1 }, // top-left is forward
+	{ x: 0, y: -1 }, // ...except on an exactly top-left/bottom-right line: up
 ];
 
 const lines: Line[] = drawn.map((l) => ({ ...l, forwardDirection: FORWARD }));
@@ -101,10 +105,10 @@ import { reverseDirection } from "@pj-hoakari/web-crowd-detection-utils/line-cro
 // reverseDirection() with no argument reverses DEFAULT_FORWARD_DIRECTION, which
 // covers lines that never set a direction of their own.
 const lines: Line[] = drawn.map((l) => ({
-  ...l,
-  forwardDirection: flipped.has(l.id)
-    ? reverseDirection(l.forwardDirection)
-    : l.forwardDirection,
+	...l,
+	forwardDirection: flipped.has(l.id)
+		? reverseDirection(l.forwardDirection)
+		: l.forwardDirection,
 }));
 ```
 
@@ -129,7 +133,7 @@ ctx.lineTo(midX + n.x * 32, midY + n.y * 32);
 
 ```ts
 for (const [lineId, { forward, backward }] of counter.getAllCounts()) {
-  console.log(lineId, "in:", forward, "out:", backward);
+	console.log(lineId, "in:", forward, "out:", backward);
 }
 ```
 
@@ -140,15 +144,20 @@ for (const [lineId, { forward, backward }] of counter.getAllCounts()) {
 // is still counted across an ID switch. cooldown: suppress repeat counts on the same
 // line for a few frames, killing jitter double-counts. Omitted fields use the defaults.
 counter.update(points, lines, {
-  assist: { enabled: true, rescueDistance: 60, rescueFrames: 15, cooldownFrames: 10 },
+	assist: {
+		enabled: true,
+		rescueDistance: 60,
+		rescueFrames: 15,
+		cooldownFrames: 10,
+	},
 });
 ```
 
 ### Reset around source switches and pauses
 
 ```ts
-counter.reset();          // clears counts + positions + assist state (new clip)
-counter.resetCounts();    // zero the tallies but keep tracked positions
+counter.reset(); // clears counts + positions + assist state (new clip)
+counter.resetCounts(); // zero the tallies but keep tracked positions
 counter.clearPositions(); // drop positions (and assist) but KEEP counts — use when tracking pauses
 counter.removeLine("door"); // forget one line's tally
 ```
@@ -164,7 +173,7 @@ Wrong:
 // typically with no segment-intersection guard and no ID-churn assist.
 const prev = new Map<number, { x: number; y: number }>();
 for (const t of tracked) {
-  // manual cross product, manual counting, manual prevPoint bookkeeping...
+	// manual cross product, manual counting, manual prevPoint bookkeeping...
 }
 ```
 
@@ -175,13 +184,13 @@ import { LineCrossingCounter } from "@pj-hoakari/web-crowd-detection-utils/line-
 
 const counter = new LineCrossingCounter();
 const points = tracked.map((t) => ({
-  trackId: t.trackId,
-  point: { x: (t.x1 + t.x2) / 2, y: t.y2 },
+	trackId: t.trackId,
+	point: { x: (t.x1 + t.x2) / 2, y: t.y2 },
 }));
 counter.update(points, lines, { assist: { enabled: true } });
 ```
 
-The package consolidates the crossing test (cross-product side **and** segment intersection) plus the ID-churn assist inside `LineCrossingCounter`. Hand-rolling usually drops the segment-intersection guard (counting points that cross the *infinite* line outside the segment) and the assist.
+The package consolidates the crossing test (cross-product side **and** segment intersection) plus the ID-churn assist inside `LineCrossingCounter`. Hand-rolling usually drops the segment-intersection guard (counting points that cross the _infinite_ line outside the segment) and the assist.
 
 Source: CLAUDE.md (lib-as-knowledge-sink design), src/line-crossing/counter.ts
 
@@ -191,9 +200,10 @@ Wrong:
 
 ```ts
 const lines = [{ id: "door", p1: { x: 320, y: 0 }, p2: { x: 320, y: 640 } }]; // 640 detection space
-const inSource = reverseLetterboxBoxes(dets, params);                          // 1280×720 source space
+const inSource = reverseLetterboxBoxes(dets, params); // 1280×720 source space
 const points = tracked.map((t) => ({
-  trackId: t.trackId, point: { x: (t.x1 + t.x2) / 2, y: t.y2 },
+	trackId: t.trackId,
+	point: { x: (t.x1 + t.x2) / 2, y: t.y2 },
 })); // tracked is source-space → mismatched with 640-space lines
 counter.update(points, lines);
 ```
@@ -204,7 +214,8 @@ Correct:
 // Keep lines and points in ONE space. Define the lines in the space your tracked
 // boxes use, then anchor the points from those same boxes.
 const points = tracked.map((t) => ({
-  trackId: t.trackId, point: { x: (t.x1 + t.x2) / 2, y: t.y2 },
+	trackId: t.trackId,
+	point: { x: (t.x1 + t.x2) / 2, y: t.y2 },
 }));
 counter.update(points, linesInTrackedSpace, { assist: { enabled: true } });
 ```
@@ -219,9 +230,9 @@ Wrong:
 
 ```ts
 for (const frame of frames) {
-  const counter = new LineCrossingCounter(); // fresh state every frame
-  counter.update(points, lines, { assist: { enabled: true } });
-  // counts never advance — there is no previous point to compare against
+	const counter = new LineCrossingCounter(); // fresh state every frame
+	counter.update(points, lines, { assist: { enabled: true } });
+	// counts never advance — there is no previous point to compare against
 }
 ```
 
@@ -230,7 +241,7 @@ Correct:
 ```ts
 const counter = new LineCrossingCounter(); // once, outside the loop
 for (const frame of frames) {
-  counter.update(points, lines, { assist: { enabled: true } });
+	counter.update(points, lines, { assist: { enabled: true } });
 }
 ```
 
@@ -252,8 +263,8 @@ Correct:
 ```ts
 // Caller reduces each detection to ITS chosen anchor point (foot here)
 const points = tracked.map((t) => ({
-  trackId: t.trackId,
-  point: { x: (t.x1 + t.x2) / 2, y: t.y2 },
+	trackId: t.trackId,
+	point: { x: (t.x1 + t.x2) / 2, y: t.y2 },
 }));
 counter.update(points, lines);
 ```
@@ -275,8 +286,8 @@ Correct:
 
 ```ts
 counter.update(points, lines, {
-  // rescueDistance / rescueFrames / cooldownFrames default to proven values
-  assist: { enabled: true },
+	// rescueDistance / rescueFrames / cooldownFrames default to proven values
+	assist: { enabled: true },
 });
 ```
 
@@ -297,12 +308,14 @@ const entering = counter.getLineCount("door").forward;
 Correct:
 
 ```ts
-const lines = [{
-  id: "door",
-  p1: { x: 320, y: 0 },
-  p2: { x: 320, y: 480 },
-  forwardDirection: { x: 1, y: 0 }, // any non-zero vector toward the intended direction
-}];
+const lines = [
+	{
+		id: "door",
+		p1: { x: 320, y: 0 },
+		p2: { x: 320, y: 480 },
+		forwardDirection: { x: 1, y: 0 }, // any non-zero vector toward the intended direction
+	},
+];
 counter.update(points, lines);
 const { forward, backward } = counter.getLineCount("door");
 const entering = forward;
@@ -319,8 +332,8 @@ Wrong:
 ```ts
 // One direction along the lines' own orientation — resolves no side for them
 const lines: Line[] = drawn.map((l) => ({
-  ...l,
-  forwardDirection: { x: -1, y: -1 },
+	...l,
+	forwardDirection: { x: -1, y: -1 },
 }));
 ```
 
@@ -330,8 +343,8 @@ Correct:
 // Ordered fallback: the first entry NOT parallel to the line wins, so two
 // directions that are not parallel to each other cover every possible line.
 const FORWARD = [
-  { x: -1, y: -1 }, // top-left is forward
-  { x: 0, y: -1 },  // ...except on an exactly top-left/bottom-right line: up
+	{ x: -1, y: -1 }, // top-left is forward
+	{ x: 0, y: -1 }, // ...except on an exactly top-left/bottom-right line: up
 ];
 const lines: Line[] = drawn.map((l) => ({ ...l, forwardDirection: FORWARD }));
 ```

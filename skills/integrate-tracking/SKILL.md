@@ -1,24 +1,26 @@
 ---
+
 name: integrate-tracking
 description: >
-  Wrap per-frame Detection[] with stateful BYTETracker to get persistent
-  trackIds, then count unique people with totalCount or a Set<trackId>.
-  Load when an agent counts unique persons, adds re-identification, tunes
-  trackBuffer for occlusions, handles multi-class detectors (one BYTETracker
-  per classId), resets the tracker, or debugs unstable IDs. Covers Detection
-  ↔ Observation structural compatibility (no remap), 3-stage cascade,
-  TrackState lifecycle, BYTETrackerOptions thresholds, and the pass-through
-  generic that preserves classId on TrackedBox.
+Wrap per-frame Detection[] with stateful BYTETracker to get persistent
+trackIds, then count unique people with totalCount or a Set<trackId>.
+Load when an agent counts unique persons, adds re-identification, tunes
+trackBuffer for occlusions, handles multi-class detectors (one BYTETracker
+per classId), resets the tracker, or debugs unstable IDs. Covers Detection
+↔ Observation structural compatibility (no remap), 3-stage cascade,
+TrackState lifecycle, BYTETrackerOptions thresholds, and the pass-through
+generic that preserves classId on TrackedBox.
 metadata:
-  type: core
-  library: web-crowd-detection-utils
-  library_version: "0.0.0"
+type: core
+library: web-crowd-detection-utils
+library_version: "0.0.0"
 sources:
-  - "pj-hoakari/web-crowd-detection-utils:src/bytetrack/tracker.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/bytetrack/types.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/bytetrack/association.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/bytetrack/constants.ts"
-  - "pj-hoakari/web-crowd-detection-utils:example/yolo-bytetrack-video/src/detection.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/bytetrack/tracker.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/bytetrack/types.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/bytetrack/association.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/bytetrack/constants.ts"
+- "pj-hoakari/web-crowd-detection-utils:example/yolo-bytetrack-video/src/detection.ts"
+
 ---
 
 # Integrate ByteTrack for stable IDs and crowd counting
@@ -29,23 +31,23 @@ sources:
 
 ```ts
 import {
-  BYTETracker,
-  type Observation,
-  type TrackedBox,
-  type BYTETrackerOptions,
+	BYTETracker,
+	type Observation,
+	type TrackedBox,
+	type BYTETrackerOptions,
 } from "@pj-hoakari/web-crowd-detection-utils/bytetrack";
 
 const tracker = new BYTETracker(); // one instance, lives across all frames
 const uniqueIds = new Set<number>();
 
 while (!signal.aborted) {
-  const { imageData, params } = capturer.capture(video);
-  const dets = await detector.detect(imageData);
-  const inSource = reverseLetterboxBoxes(dets, params);  // source-space, NOT model-space
-  const tracked = tracker.update(inSource);              // classId rides along
+	const { imageData, params } = capturer.capture(video);
+	const dets = await detector.detect(imageData);
+	const inSource = reverseLetterboxBoxes(dets, params); // source-space, NOT model-space
+	const tracked = tracker.update(inSource); // classId rides along
 
-  for (const t of tracked) uniqueIds.add(t.trackId);
-  // tracker.totalCount === uniqueIds.size (until tracker.reset())
+	for (const t of tracked) uniqueIds.add(t.trackId);
+	// tracker.totalCount === uniqueIds.size (until tracker.reset())
 }
 ```
 
@@ -61,7 +63,7 @@ const dets: Detection[] = await detector.detect(imageData);
 // through the tracker's generic pass-through.
 const tracked = tracker.update(dets);
 for (const t of tracked) {
-  console.log(t.trackId, t.classId, t.x1, t.y1, t.x2, t.y2, t.score);
+	console.log(t.trackId, t.classId, t.x1, t.y1, t.x2, t.y2, t.score);
 }
 ```
 
@@ -70,19 +72,21 @@ for (const t of tracked) {
 ```ts
 const trackers = new Map<number, BYTETracker>();
 
-function trackMultiClass(dets: Detection[]): (TrackedBox & { classId: number })[] {
-  const byClass = new Map<number, Detection[]>();
-  for (const d of dets) {
-    const arr = byClass.get(d.classId) ?? [];
-    arr.push(d);
-    byClass.set(d.classId, arr);
-  }
-  return [...byClass].flatMap(([cls, classDets]) => {
-    if (!trackers.has(cls)) trackers.set(cls, new BYTETracker());
-    const t = trackers.get(cls);
-    if (!t) return [];
-    return t.update(classDets);
-  });
+function trackMultiClass(
+	dets: Detection[],
+): (TrackedBox & { classId: number })[] {
+	const byClass = new Map<number, Detection[]>();
+	for (const d of dets) {
+		const arr = byClass.get(d.classId) ?? [];
+		arr.push(d);
+		byClass.set(d.classId, arr);
+	}
+	return [...byClass].flatMap(([cls, classDets]) => {
+		if (!trackers.has(cls)) trackers.set(cls, new BYTETracker());
+		const t = trackers.get(cls);
+		if (!t) return [];
+		return t.update(classDets);
+	});
 }
 ```
 
@@ -143,9 +147,9 @@ Wrong:
 
 ```ts
 for (const frame of frames) {
-  const tracker = new BYTETracker(); // fresh state every frame
-  const tracked = tracker.update(dets);
-  uniqueIds.add(tracked[0].trackId); // always 1, 1, 1...
+	const tracker = new BYTETracker(); // fresh state every frame
+	const tracked = tracker.update(dets);
+	uniqueIds.add(tracked[0].trackId); // always 1, 1, 1...
 }
 ```
 
@@ -154,8 +158,8 @@ Correct:
 ```ts
 const tracker = new BYTETracker(); // once
 for (const frame of frames) {
-  const tracked = tracker.update(await detector.detect(frame));
-  for (const t of tracked) uniqueIds.add(t.trackId);
+	const tracked = tracker.update(await detector.detect(frame));
+	for (const t of tracked) uniqueIds.add(t.trackId);
 }
 ```
 
@@ -171,7 +175,11 @@ Wrong:
 const detections = await detector.detect(imageData);
 // Unnecessary — also drops classId from pass-through, breaking multi-class flows
 const observations = detections.map((d) => ({
-  x1: d.x1, y1: d.y1, x2: d.x2, y2: d.y2, score: d.score,
+	x1: d.x1,
+	y1: d.y1,
+	x2: d.x2,
+	y2: d.y2,
+	score: d.score,
 }));
 const tracked = tracker.update(observations);
 ```
@@ -216,7 +224,7 @@ Source: src/bytetrack/association.ts:30-39 (iouDistance — no classId reference
 Wrong:
 
 ```ts
-tracker.reset();   // clears IDs AND zeros totalCount
+tracker.reset(); // clears IDs AND zeros totalCount
 console.log(tracker.totalCount); // 0 — surprising if "pause" was meant
 ```
 

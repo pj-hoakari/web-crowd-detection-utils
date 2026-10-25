@@ -1,23 +1,25 @@
 ---
+
 name: set-up-detection-pipeline
 description: >
-  Wire createYoloDetector + createLetterboxCapturer + reverseLetterboxBoxes to
-  turn a video or image into Detection[] in source-image space. Load when an
-  agent is setting up YOLO person/crowd detection in the browser for the first
-  time, choosing executionProvider ("webgpu" / "wasm") with manual fallback,
-  sizing inputSize, or wiring detect() into a requestAnimationFrame loop.
-  Covers the happy path through @pj-hoakari/web-crowd-detection-utils/yolo
-  and /onnx and /source subpaths.
+Wire createYoloDetector + createLetterboxCapturer + reverseLetterboxBoxes to
+turn a video or image into Detection[] in source-image space. Load when an
+agent is setting up YOLO person/crowd detection in the browser for the first
+time, choosing executionProvider ("webgpu" / "wasm") with manual fallback,
+sizing inputSize, or wiring detect() into a requestAnimationFrame loop.
+Covers the happy path through @pj-hoakari/web-crowd-detection-utils/yolo
+and /onnx and /source subpaths.
 metadata:
-  type: core
-  library: web-crowd-detection-utils
-  library_version: "0.0.0"
+type: core
+library: web-crowd-detection-utils
+library_version: "0.0.0"
 sources:
-  - "pj-hoakari/web-crowd-detection-utils:src/yolo/detector.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/yolo/index.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/yolo/types.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/onnx/session.ts"
-  - "pj-hoakari/web-crowd-detection-utils:example/yolo-webcam/src/detection.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/yolo/detector.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/yolo/index.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/yolo/types.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/onnx/session.ts"
+- "pj-hoakari/web-crowd-detection-utils:example/yolo-webcam/src/detection.ts"
+
 ---
 
 # Set up a YOLO detection pipeline
@@ -29,53 +31,53 @@ Compose `createYoloDetector` (yolo subpath) with a capturer (source subpath) and
 ```ts
 import { isWebGpuAvailable } from "@pj-hoakari/web-crowd-detection-utils/onnx";
 import {
-  createLetterboxCapturer,
-  reverseLetterboxBoxes,
+	createLetterboxCapturer,
+	reverseLetterboxBoxes,
 } from "@pj-hoakari/web-crowd-detection-utils/source";
 import {
-  createYoloDetector,
-  type Detection,
+	createYoloDetector,
+	type Detection,
 } from "@pj-hoakari/web-crowd-detection-utils/yolo";
 
 const INPUT_SIZE = 640;
 
 async function startDetection(
-  modelBuffer: ArrayBuffer,
-  video: HTMLVideoElement,
-  signal: AbortSignal,
-  onFrame: (dets: readonly Detection[]) => void,
+	modelBuffer: ArrayBuffer,
+	video: HTMLVideoElement,
+	signal: AbortSignal,
+	onFrame: (dets: readonly Detection[]) => void,
 ): Promise<void> {
-  const preferred = isWebGpuAvailable() ? "webgpu" : "wasm";
-  let detector;
-  try {
-    detector = await createYoloDetector({
-      modelPath: modelBuffer,
-      executionProvider: preferred,
-      inputSize: INPUT_SIZE,
-      postprocess: { format: "auto" },
-    });
-  } catch (err) {
-    if (preferred !== "webgpu") throw err;
-    detector = await createYoloDetector({
-      modelPath: modelBuffer,
-      executionProvider: "wasm",
-      inputSize: INPUT_SIZE,
-      postprocess: { format: "auto" },
-    });
-  }
+	const preferred = isWebGpuAvailable() ? "webgpu" : "wasm";
+	let detector;
+	try {
+		detector = await createYoloDetector({
+			modelPath: modelBuffer,
+			executionProvider: preferred,
+			inputSize: INPUT_SIZE,
+			postprocess: { format: "auto" },
+		});
+	} catch (err) {
+		if (preferred !== "webgpu") throw err;
+		detector = await createYoloDetector({
+			modelPath: modelBuffer,
+			executionProvider: "wasm",
+			inputSize: INPUT_SIZE,
+			postprocess: { format: "auto" },
+		});
+	}
 
-  const capturer = createLetterboxCapturer({ inputSize: INPUT_SIZE });
+	const capturer = createLetterboxCapturer({ inputSize: INPUT_SIZE });
 
-  while (!signal.aborted) {
-    if (video.readyState < video.HAVE_CURRENT_DATA) {
-      await new Promise<void>((r) => requestAnimationFrame(() => r()));
-      continue;
-    }
-    const { imageData, params } = capturer.capture(video);
-    const dets = await detector.detect(imageData);
-    onFrame(reverseLetterboxBoxes(dets, params));
-    await new Promise<void>((r) => requestAnimationFrame(() => r()));
-  }
+	while (!signal.aborted) {
+		if (video.readyState < video.HAVE_CURRENT_DATA) {
+			await new Promise<void>((r) => requestAnimationFrame(() => r()));
+			continue;
+		}
+		const { imageData, params } = capturer.capture(video);
+		const dets = await detector.detect(imageData);
+		onFrame(reverseLetterboxBoxes(dets, params));
+		await new Promise<void>((r) => requestAnimationFrame(() => r()));
+	}
 }
 ```
 
@@ -90,9 +92,9 @@ const modelBuffer = await response.arrayBuffer();
 // modelPath accepts string | ArrayBufferLike | Uint8Array — buffer form
 // lets the host app control caching, retry, and error handling.
 const detector = await createYoloDetector({
-  modelPath: modelBuffer,
-  executionProvider: "webgpu",
-  postprocess: { format: "auto" },
+	modelPath: modelBuffer,
+	executionProvider: "webgpu",
+	postprocess: { format: "auto" },
 });
 ```
 
@@ -102,9 +104,9 @@ const detector = await createYoloDetector({
 // "auto" dispatches based on tensor shape — works for Ultralytics stock
 // exports (standard) AND for exports with built-in NMS (end-to-end).
 const detector = await createYoloDetector({
-  modelPath,
-  executionProvider: "webgpu",
-  postprocess: { format: "auto" },
+	modelPath,
+	executionProvider: "webgpu",
+	postprocess: { format: "auto" },
 });
 ```
 
@@ -115,9 +117,9 @@ The library default is `"end-to-end"` (matches NMS-included exports). Stock Ultr
 ```ts
 const detector = await createYoloDetector({ modelPath, executionProvider });
 while (!signal.aborted) {
-  const { imageData, params } = capturer.capture(video);
-  const dets = await detector.detect(imageData); // reuses owned preprocessBuffer
-  // ...
+	const { imageData, params } = capturer.capture(video);
+	const dets = await detector.detect(imageData); // reuses owned preprocessBuffer
+	// ...
 }
 ```
 
@@ -146,9 +148,9 @@ try {
 // the served path:
 //   npx wcdu-copy-runtime-assets public/onnxruntime
 const detector = await createYoloDetector({
-  modelPath,
-  executionProvider: "webgpu",
-  session: { wasmPaths: "/onnxruntime/" }, // forwarded straight to initSession
+	modelPath,
+	executionProvider: "webgpu",
+	session: { wasmPaths: "/onnxruntime/" }, // forwarded straight to initSession
 });
 ```
 
@@ -162,8 +164,8 @@ Wrong:
 
 ```ts
 const detector = await createYoloDetector({
-  modelPath: "/models/yolov8n.onnx",
-  executionProvider: "webgpu",
+	modelPath: "/models/yolov8n.onnx",
+	executionProvider: "webgpu",
 });
 await detector.detect(imageData); // throws: shape does not match "end-to-end"
 ```
@@ -172,9 +174,9 @@ Correct:
 
 ```ts
 const detector = await createYoloDetector({
-  modelPath: "/models/yolov8n.onnx",
-  executionProvider: "webgpu",
-  postprocess: { format: "auto" },
+	modelPath: "/models/yolov8n.onnx",
+	executionProvider: "webgpu",
+	postprocess: { format: "auto" },
 });
 ```
 
@@ -211,8 +213,8 @@ Wrong:
 
 ```ts
 const detector = await createYoloDetector({
-  modelPath,
-  executionProvider: "webgpu",
+	modelPath,
+	executionProvider: "webgpu",
 });
 // throws on Safari, SSR, Firefox without flag — no auto fallback
 ```
@@ -240,8 +242,8 @@ Wrong:
 ```ts
 // detection.ts — runs at import time, breaks SSR / Node
 export const detector = await createYoloDetector({
-  modelPath: "/models/yolo26n.onnx",
-  executionProvider: "webgpu",
+	modelPath: "/models/yolo26n.onnx",
+	executionProvider: "webgpu",
 });
 ```
 
@@ -250,10 +252,10 @@ Correct:
 ```ts
 // detection.ts — defer to a browser-only event handler
 export async function getDetector() {
-  return createYoloDetector({
-    modelPath: await fetchModel(),
-    executionProvider: "webgpu",
-  });
+	return createYoloDetector({
+		modelPath: await fetchModel(),
+		executionProvider: "webgpu",
+	});
 }
 // call from useEffect / event handler, not during SSR render
 ```

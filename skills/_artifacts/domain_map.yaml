@@ -237,7 +237,7 @@ skills:
         source: "src/yolo/postprocess.ts:113-122 (needsSigmoid sampling)"
         priority: "MEDIUM"
         status: "active"
-      - mistake: "Blind trust in `format: \"auto\"` on edge-shape models"
+      - mistake: 'Blind trust in `format: "auto"` on edge-shape models'
         mechanism: "dispatchAuto picks the decoder from dim positions: dim2===6 → end-to-end, dim1===6 → end-to-end-transposed, dim1<dim2 → standard, dim1>dim2 → standard-transposed. This misfires on (a) a 2-class standard export where attrs=4+2=6 looks identical to end-to-end-transposed [1, 6, N], (b) models where N is unusually small and ordering ambiguity bites the dim1 vs dim2 comparison, (c) non-Ultralytics exports (YOLOv9 / YOLO-NAS / RT-DETR) whose shapes don't match any branch. The console.warn for unrecognized shapes is easy to miss in production logs."
         wrong_pattern: |
           // 2-class custom model with standard layout [1, 6, 8400]
@@ -716,7 +716,12 @@ skills:
         source: "src/background/types.ts:1-21 (Box is in background-model pixel space), src/background/subtractor.ts:122-127 (update dim check), maintainer interview (Q2)"
         priority: "CRITICAL"
         status: "active"
-        skills: ["suppress-static-detections", "handle-frame-coordinates", "integrate-tracking"]
+        skills:
+          [
+            "suppress-static-detections",
+            "handle-frame-coordinates",
+            "integrate-tracking",
+          ]
       - mistake: "Expecting suppressStatic to drop boxes"
         mechanism: "suppressStatic returns a copy in which static boxes have score *= suppressFactor; the boxes are still present. Treating it as a filter (expecting the array to shrink) leaves attenuated static detections in the pipeline — they reappear in rendering or tracking unless the caller applies its own cutout / threshold on the new scores."
         wrong_pattern: |
@@ -828,7 +833,12 @@ skills:
         source: "src/line-crossing/types.ts:1-40 (Line / Point shared space), src/line-crossing/counter.ts (no scaling), maintainer interview (Q2)"
         priority: "CRITICAL"
         status: "active"
-        skills: ["count-line-crossings", "handle-frame-coordinates", "integrate-tracking"]
+        skills:
+          [
+            "count-line-crossings",
+            "handle-frame-coordinates",
+            "integrate-tracking",
+          ]
       - mistake: "Re-instantiating LineCrossingCounter per frame"
         mechanism: "The counter is stateful — it compares each track's point this frame against the point it held last frame. A per-frame instance has no previous point, so no crossing is ever detected and every line stays at zero."
         wrong_pattern: |
@@ -1014,7 +1024,7 @@ cross_references:
 gaps:
   - skill: "configure-yolo-postprocess"
     question: "Are there known YOLO export variants where 'auto' picks the wrong format heuristic?"
-    context: "Resolved as a failure mode rather than an open gap — see 'Blind trust in `format: \"auto\"` on edge-shape models'."
+    context: 'Resolved as a failure mode rather than an open gap — see ''Blind trust in `format: "auto"` on edge-shape models''.'
     status: "resolved"
   - skill: "integrate-tracking"
     question: "Recommended pattern for multi-class tracking — single class-agnostic tracker vs per-class instances?"

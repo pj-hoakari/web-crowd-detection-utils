@@ -11,13 +11,13 @@
 
 ## 使用しているサブパス
 
-| サブパス | 役割 |
-| --- | --- |
-| `onnx` | バックエンド選択（WebGPU / WASM）。`yolo` 経由で利用 |
-| `yolo` | 人物検出（postprocess は `format: "auto"`、person クラスのみ） |
-| `source` | レターボックスキャプチャ（`createLetterboxCapturer`）と逆変換（`reverseLetterboxBoxes`） |
-| `background` | `BackgroundSubtractor` で静止領域の検出を抑制（トグル可能） |
-| `bytetrack` | `BYTETracker` で安定した track ID を付与 |
+| サブパス        | 役割                                                                                                                  |
+| --------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `onnx`          | バックエンド選択（WebGPU / WASM）。`yolo` 経由で利用                                                                  |
+| `yolo`          | 人物検出（postprocess は `format: "auto"`、person クラスのみ）                                                        |
+| `source`        | レターボックスキャプチャ（`createLetterboxCapturer`）と逆変換（`reverseLetterboxBoxes`）                              |
+| `background`    | `BackgroundSubtractor` で静止領域の検出を抑制（トグル可能）                                                           |
+| `bytetrack`     | `BYTETracker` で安定した track ID を付与                                                                              |
 | `line-crossing` | `LineCrossingCounter` でライン通過を方向別に集計。`forward` 側の描画は `forwardNormal()`、反転は `reverseDirection()` |
 
 ## パイプライン（`src/worker.ts`）
@@ -34,15 +34,14 @@
 
 ## アーキテクチャ（Web Worker + OffscreenCanvas）
 
-| ファイル | スレッド | 役割 |
-| --- | --- | --- |
-| `src/App.tsx` | メイン | UI・状態管理。`<canvas>` を `transferControlToOffscreen()` で Worker に委譲し、`<video>` のフレームを `createImageBitmap()` で取得して転送する。ライン描画のポインタ操作のみメインで処理 |
-| `src/worker.ts` | Worker | モデル読込・推論・追跡・計数、および委譲された `OffscreenCanvas` へのオーバーレイ描画 |
-| `src/protocol.ts` | 共有 | メイン ⇔ Worker のメッセージ型 |
-| `src/overlay.ts` | 共有 | 描画ヘルパー（Worker 側で `OffscreenCanvas` に描画。`clientToCanvas` のみメインで使用） |
+| ファイル          | スレッド | 役割                                                                                                                                                                                     |
+| ----------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/App.tsx`     | メイン   | UI・状態管理。`<canvas>` を `transferControlToOffscreen()` で Worker に委譲し、`<video>` のフレームを `createImageBitmap()` で取得して転送する。ライン描画のポインタ操作のみメインで処理 |
+| `src/worker.ts`   | Worker   | モデル読込・推論・追跡・計数、および委譲された `OffscreenCanvas` へのオーバーレイ描画                                                                                                    |
+| `src/protocol.ts` | 共有     | メイン ⇔ Worker のメッセージ型                                                                                                                                                           |
+| `src/overlay.ts`  | 共有     | 描画ヘルパー（Worker 側で `OffscreenCanvas` に描画。`clientToCanvas` のみメインで使用）                                                                                                  |
 
 ポイント:
-
 - Worker 内には DOM が無いため、`source` の `createLetterboxCapturer` が内部スクラッチに **`OffscreenCanvas` を自動選択**する（パッケージ側の対応による）
 - フレームは「Worker が処理中なら送らない」バックプレッシャ方式でドロップし、キューの肥大化を防ぐ
 - `transferControlToOffscreen()` はキャンバスごとに一度しか呼べないため、Worker 生成とキャンバス委譲は ref ガードで1回に限定（React StrictMode の二重実行対策）

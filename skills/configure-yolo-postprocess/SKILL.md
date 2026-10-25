@@ -1,21 +1,23 @@
 ---
+
 name: configure-yolo-postprocess
 description: >
-  Tune OutputFormat (auto / end-to-end / end-to-end-transposed / standard /
-  standard-transposed), confThreshold, iouThreshold, maxDetections, and
-  classFilter for the loaded YOLO ONNX model. Load when the agent debugs zero
-  detections, a shape-mismatch error, an unexpected class set, or a >30
-  detection ceiling. Covers postprocess() and nms() low-level entry points,
-  sigmoid auto-detection in standard formats, and the dispatchAuto heuristic
-  limits documented as failure modes.
+Tune OutputFormat (auto / end-to-end / end-to-end-transposed / standard /
+standard-transposed), confThreshold, iouThreshold, maxDetections, and
+classFilter for the loaded YOLO ONNX model. Load when the agent debugs zero
+detections, a shape-mismatch error, an unexpected class set, or a >30
+detection ceiling. Covers postprocess() and nms() low-level entry points,
+sigmoid auto-detection in standard formats, and the dispatchAuto heuristic
+limits documented as failure modes.
 metadata:
-  type: core
-  library: web-crowd-detection-utils
-  library_version: "0.0.0"
+type: core
+library: web-crowd-detection-utils
+library_version: "0.0.0"
 sources:
-  - "pj-hoakari/web-crowd-detection-utils:src/yolo/postprocess.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/yolo/nms.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/yolo/types.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/yolo/postprocess.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/yolo/nms.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/yolo/types.ts"
+
 ---
 
 # Configure YOLO postprocess for your model export
@@ -26,27 +28,27 @@ sources:
 
 ```ts
 import {
-  createYoloDetector,
-  postprocess,
-  nms,
-  DEFAULT_CONF_THRESHOLD,    // 0.15
-  DEFAULT_FORMAT,            // "end-to-end"
-  DEFAULT_CLASS_FILTER,      // [0] (COCO person)
-  DEFAULT_IOU_THRESHOLD,     // 0.45
-  DEFAULT_MAX_DETECTIONS,    // 30
+	createYoloDetector,
+	postprocess,
+	nms,
+	DEFAULT_CONF_THRESHOLD, // 0.15
+	DEFAULT_FORMAT, // "end-to-end"
+	DEFAULT_CLASS_FILTER, // [0] (COCO person)
+	DEFAULT_IOU_THRESHOLD, // 0.45
+	DEFAULT_MAX_DETECTIONS, // 30
 } from "@pj-hoakari/web-crowd-detection-utils/yolo";
 
 // Most consumers go through createYoloDetector's postprocess field:
 const detector = await createYoloDetector({
-  modelPath,
-  executionProvider: "webgpu",
-  postprocess: {
-    format: "auto",
-    confThreshold: 0.25,
-    iouThreshold: 0.45,
-    maxDetections: 100,
-    classFilter: "all",
-  },
+	modelPath,
+	executionProvider: "webgpu",
+	postprocess: {
+		format: "auto",
+		confThreshold: 0.25,
+		iouThreshold: 0.45,
+		maxDetections: 100,
+		classFilter: "all",
+	},
 });
 ```
 
@@ -57,17 +59,17 @@ const detector = await createYoloDetector({
 ```ts
 // Development / first-pass: let the heuristic dispatch
 const dev = await createYoloDetector({
-  modelPath,
-  executionProvider: "webgpu",
-  postprocess: { format: "auto" },
+	modelPath,
+	executionProvider: "webgpu",
+	postprocess: { format: "auto" },
 });
 
 // Production: pin the format. dispatchAuto logs the chosen format ONCE
 // per page lifetime via console.log — read it during dev, then lock it in.
 const prod = await createYoloDetector({
-  modelPath,
-  executionProvider: "webgpu",
-  postprocess: { format: "standard" }, // e.g. for stock Ultralytics export
+	modelPath,
+	executionProvider: "webgpu",
+	postprocess: { format: "standard" }, // e.g. for stock Ultralytics export
 });
 ```
 
@@ -76,15 +78,15 @@ const prod = await createYoloDetector({
 ```ts
 // Default is [0] (COCO person). Override for everything else.
 const all = await createYoloDetector({
-  modelPath,
-  executionProvider: "webgpu",
-  postprocess: { format: "auto", classFilter: "all" },
+	modelPath,
+	executionProvider: "webgpu",
+	postprocess: { format: "auto", classFilter: "all" },
 });
 
 const vehicles = await createYoloDetector({
-  modelPath,
-  executionProvider: "webgpu",
-  postprocess: { format: "auto", classFilter: [2, 3, 5, 7] }, // car, motorcycle, bus, truck
+	modelPath,
+	executionProvider: "webgpu",
+	postprocess: { format: "auto", classFilter: [2, 3, 5, 7] }, // car, motorcycle, bus, truck
 });
 ```
 
@@ -93,13 +95,13 @@ const vehicles = await createYoloDetector({
 ```ts
 // Default cap is 30. Counting in stadium / mall footage requires higher.
 const crowded = await createYoloDetector({
-  modelPath,
-  executionProvider: "webgpu",
-  postprocess: {
-    format: "auto",
-    confThreshold: 0.1,    // accept lower-score detections
-    maxDetections: 300,    // lift the ceiling
-  },
+	modelPath,
+	executionProvider: "webgpu",
+	postprocess: {
+		format: "auto",
+		confThreshold: 0.1, // accept lower-score detections
+		maxDetections: 300, // lift the ceiling
+	},
 });
 ```
 
@@ -109,11 +111,13 @@ const crowded = await createYoloDetector({
 import type * as ort from "onnxruntime-web";
 
 // You ran inference outside createYoloDetector — feed the raw tensor through.
-const tensor: ort.Tensor = await session.run({ images: input }).then((r) => r[outputName]);
+const tensor: ort.Tensor = await session
+	.run({ images: input })
+	.then((r) => r[outputName]);
 const dets = postprocess(tensor, {
-  format: "auto",
-  confThreshold: 0.2,
-  classFilter: "all",
+	format: "auto",
+	confThreshold: 0.2,
+	classFilter: "all",
 });
 
 // Or run NMS on detections from a non-YOLO decoder:
@@ -129,9 +133,9 @@ Wrong:
 ```ts
 // Custom-trained model where class 0 ≠ person
 const detector = await createYoloDetector({
-  modelPath: "/models/vehicles.onnx",
-  executionProvider: "webgpu",
-  postprocess: { format: "auto" },
+	modelPath: "/models/vehicles.onnx",
+	executionProvider: "webgpu",
+	postprocess: { format: "auto" },
 });
 // Result: only classId === 0 boxes returned; everything else dropped.
 ```
@@ -140,9 +144,9 @@ Correct:
 
 ```ts
 const detector = await createYoloDetector({
-  modelPath: "/models/vehicles.onnx",
-  executionProvider: "webgpu",
-  postprocess: { format: "auto", classFilter: "all" }, // or specific allow-list
+	modelPath: "/models/vehicles.onnx",
+	executionProvider: "webgpu",
+	postprocess: { format: "auto", classFilter: "all" }, // or specific allow-list
 });
 ```
 
@@ -157,9 +161,9 @@ Wrong:
 ```ts
 // 2-class standard export has attrs = 4 + 2 = 6 — same shape as end-to-end-transposed
 const detector = await createYoloDetector({
-  modelPath: "/models/custom-2class.onnx",
-  executionProvider: "webgpu",
-  postprocess: { format: "auto" }, // picks end-to-end-transposed → garbage
+	modelPath: "/models/custom-2class.onnx",
+	executionProvider: "webgpu",
+	postprocess: { format: "auto" }, // picks end-to-end-transposed → garbage
 });
 ```
 
@@ -169,9 +173,9 @@ Correct:
 // Verify dispatchAuto's [yolo] console log matches the actual export during dev,
 // then pin the format.
 const detector = await createYoloDetector({
-  modelPath: "/models/custom-2class.onnx",
-  executionProvider: "webgpu",
-  postprocess: { format: "standard" },
+	modelPath: "/models/custom-2class.onnx",
+	executionProvider: "webgpu",
+	postprocess: { format: "standard" },
 });
 ```
 
@@ -206,10 +210,10 @@ Wrong:
 ```ts
 // Counting crowds of >30 people
 const detector = await createYoloDetector({
-  modelPath,
-  executionProvider: "webgpu",
-  postprocess: { format: "auto", confThreshold: 0.05 },
-  // maxDetections defaults to 30 — silently capped after 30 keeps
+	modelPath,
+	executionProvider: "webgpu",
+	postprocess: { format: "auto", confThreshold: 0.05 },
+	// maxDetections defaults to 30 — silently capped after 30 keeps
 });
 ```
 
@@ -217,9 +221,9 @@ Correct:
 
 ```ts
 const detector = await createYoloDetector({
-  modelPath,
-  executionProvider: "webgpu",
-  postprocess: { format: "auto", confThreshold: 0.05, maxDetections: 300 },
+	modelPath,
+	executionProvider: "webgpu",
+	postprocess: { format: "auto", confThreshold: 0.05, maxDetections: 300 },
 });
 ```
 

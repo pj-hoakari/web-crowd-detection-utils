@@ -4,31 +4,29 @@
 
 ## At a glance
 
-| Field                     | Default | Type                | Role                                                       |
-| ------------------------- | ------- | ------------------- | ---------------------------------------------------------- |
-| `highThresh`              | `0.2`   | score threshold     | Splits Stage 1 (high-conf) vs Stage 2 (low-conf) routing  |
-| `matchThresh`             | `0.8`   | IoU-distance ceiling | Stage 1 association ceiling (high-conf × tracked+lost)     |
-| `secondMatchThresh`       | `0.5`   | IoU-distance ceiling | Stage 2 association ceiling (low-conf × remaining tracked) |
-| `unconfirmedMatchThresh`  | `0.7`   | IoU-distance ceiling | Stage 3 association ceiling (remaining high-conf × unconfirmed) |
-| `newTrackThresh`          | `0.15`  | score threshold     | Minimum score for an unmatched observation to spawn a new track |
-| `duplicateIouThresh`      | `0.15`  | IoU-distance        | Threshold below which two tracks are treated as duplicates (shorter-lived dropped) |
-| `trackBuffer`             | `30`    | frame count         | Frames a lost track is retained before removal (~1 s at 30 FPS) |
+| Field                    | Default | Type                 | Role                                                                               |
+| ------------------------ | ------- | -------------------- | ---------------------------------------------------------------------------------- |
+| `highThresh`             | `0.2`   | score threshold      | Splits Stage 1 (high-conf) vs Stage 2 (low-conf) routing                           |
+| `matchThresh`            | `0.8`   | IoU-distance ceiling | Stage 1 association ceiling (high-conf × tracked+lost)                             |
+| `secondMatchThresh`      | `0.5`   | IoU-distance ceiling | Stage 2 association ceiling (low-conf × remaining tracked)                         |
+| `unconfirmedMatchThresh` | `0.7`   | IoU-distance ceiling | Stage 3 association ceiling (remaining high-conf × unconfirmed)                    |
+| `newTrackThresh`         | `0.15`  | score threshold      | Minimum score for an unmatched observation to spawn a new track                    |
+| `duplicateIouThresh`     | `0.15`  | IoU-distance         | Threshold below which two tracks are treated as duplicates (shorter-lived dropped) |
+| `trackBuffer`            | `30`    | frame count          | Frames a lost track is retained before removal (~1 s at 30 FPS)                    |
 
 **Reading the thresholds:**
-
 - **Score thresholds** (`highThresh`, `newTrackThresh`) — raw `[0, 1]` scores. Higher = stricter.
 - **IoU-distance thresholds** (`matchThresh`, `secondMatchThresh`, `unconfirmedMatchThresh`, `duplicateIouThresh`) — `1 - IoU`. **Lower = stricter** (require tighter overlap to consider a match).
 
-This is the most common confusion source: tightening `matchThresh` means *lowering* it (e.g. from 0.8 to 0.6), not raising it.
+This is the most common confusion source: tightening `matchThresh` means _lowering_ it (e.g. from 0.8 to 0.6), not raising it.
 
 ## The 3-stage cascade
 
 Each `update()` call runs:
-
 1. **Predict** — every existing track advances its Kalman state by one frame.
 2. **Stage 1** — split detections by `highThresh`. The high-conf set is matched against the pool of `tracked ∪ lost` tracks via IoU. Threshold: `matchThresh`. Matched lost tracks re-activate (re-identification across occlusions).
 3. **Stage 2** — low-conf detections are matched against tracked tracks that Stage 1 didn't claim. Threshold: `secondMatchThresh`. This is ByteTrack's distinguishing idea — recovering occluded objects whose score dropped this frame.
-4. **Stage 3** — high-conf detections left over from Stage 1 are matched against *unconfirmed* tracks (candidates from the previous frame). Threshold: `unconfirmedMatchThresh`.
+4. **Stage 3** — high-conf detections left over from Stage 1 are matched against _unconfirmed_ tracks (candidates from the previous frame). Threshold: `unconfirmedMatchThresh`.
 5. **Spawn** — unmatched high-conf detections clearing `newTrackThresh` become new tracks. Unmatched low-conf detections clearing `newTrackThresh` also can — but usually `newTrackThresh > highThresh` so this never fires.
 6. **Age out** — lost tracks older than `trackBuffer` frames are removed.
 7. **Dedup** — tracks pairwise within `duplicateIouThresh` collapse; the shorter-lived one is dropped.
@@ -85,17 +83,19 @@ The track with the longer lifetime (`endFrame - startFrame`) wins.
 
 ```ts
 class BYTETracker {
-  constructor(opts?: BYTETrackerOptions);
+	constructor(opts?: BYTETrackerOptions);
 
-  // Mutates internal state. Returns active tracks for this frame.
-  // T preserves through (e.g. classId from Detection rides onto each TrackedBox).
-  update<T extends Observation>(observations: T[]): (TrackedBox & Omit<T, keyof Observation>)[];
+	// Mutates internal state. Returns active tracks for this frame.
+	// T preserves through (e.g. classId from Detection rides onto each TrackedBox).
+	update<T extends Observation>(
+		observations: T[],
+	): (TrackedBox & Omit<T, keyof Observation>)[];
 
-  // Clears all state, resets frameId to 0 and the ID generator to 1.
-  reset(): void;
+	// Clears all state, resets frameId to 0 and the ID generator to 1.
+	reset(): void;
 
-  // nextId - 1. Monotonically increasing until reset().
-  readonly totalCount: number;
+	// nextId - 1. Monotonically increasing until reset().
+	readonly totalCount: number;
 }
 ```
 
@@ -108,7 +108,6 @@ const TrackState = { New: 0, Tracked: 1, Lost: 2, Removed: 3 } as const;
 Public API only surfaces `TrackState` through internal `STrack.state` (not exposed on `TrackedBox`). The exported value is useful for narrowing if you read through `BYTETracker` internals; consumer code rarely needs it.
 
 Transitions:
-
 - `New → Tracked` on first successful association
 - `Tracked → Lost` when no matching observation this frame
 - `Lost → Tracked` on re-association within `trackBuffer`
