@@ -4,20 +4,19 @@
 
 ## Variant catalog
 
-| `format` value             | Expected tensor shape | NMS internal? | Sigmoid auto-detect? | When the export emits this layout                                                                       |
-| -------------------------- | --------------------- | ------------- | -------------------- | ------------------------------------------------------------------------------------------------------- |
-| `"end-to-end"`             | `[1, N, 6]` or `[N, 6]` | No (already applied by model plugin) | No (scores already 0..1) | YOLO exports with built-in NMS (e.g. via `nms=True` or attached ORT postprocess plugin)                  |
-| `"end-to-end-transposed"`  | `[1, 6, N]`           | No (already applied) | No                  | Same plugin output with axes swapped (some ONNX simplifiers transpose the trailing axis)                 |
-| `"standard"`               | `[1, attrs, N]` where `attrs = 4 + numClasses` | Yes (greedy NMS)    | Yes (samples 10 values) | Stock Ultralytics export: `yolo export model=*.pt format=onnx imgsz=640 simplify=True`                  |
-| `"standard-transposed"`    | `[1, N, attrs]`       | Yes (greedy NMS)    | Yes                  | Some exporters emit the standard layout with axes transposed                                             |
-| `"auto"`                   | inspects `output.dims` at runtime | depends on resolved layout | depends on resolved layout | Use during development; pin a specific format for production once `dispatchAuto` logs the chosen value |
+| `format` value            | Expected tensor shape                          | NMS internal?                        | Sigmoid auto-detect?       | When the export emits this layout                                                                      |
+| ------------------------- | ---------------------------------------------- | ------------------------------------ | -------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `"end-to-end"`            | `[1, N, 6]` or `[N, 6]`                        | No (already applied by model plugin) | No (scores already 0..1)   | YOLO exports with built-in NMS (e.g. via `nms=True` or attached ORT postprocess plugin)                |
+| `"end-to-end-transposed"` | `[1, 6, N]`                                    | No (already applied)                 | No                         | Same plugin output with axes swapped (some ONNX simplifiers transpose the trailing axis)               |
+| `"standard"`              | `[1, attrs, N]` where `attrs = 4 + numClasses` | Yes (greedy NMS)                     | Yes (samples 10 values)    | Stock Ultralytics export: `yolo export model=*.pt format=onnx imgsz=640 simplify=True`                 |
+| `"standard-transposed"`   | `[1, N, attrs]`                                | Yes (greedy NMS)                     | Yes                        | Some exporters emit the standard layout with axes transposed                                           |
+| `"auto"`                  | inspects `output.dims` at runtime              | depends on resolved layout           | depends on resolved layout | Use during development; pin a specific format for production once `dispatchAuto` logs the chosen value |
 
 Each row's `data` is a `Float32Array` regardless of layout. Coordinates are in **model input space** (`0..inputSize` per axis) — apply `reverseLetterboxBox` or `reverseStretchBox` from the `source` subpath to map back to source-image space.
 
 ## `"end-to-end"` decoder
 
 Layout `[1, N, 6]` rows: `[x1, y1, x2, y2, score, classId]`.
-
 - Skips rows where `score <= 0` (zero-filled padding).
 - Skips rows where `score < confThreshold` (default 0.15).
 - Skips rows where `classId` not in `classFilter` (default `[0]`).
@@ -31,12 +30,10 @@ Layout `[1, 6, N]`. The decoder first transposes to `[1, N, 6]` then runs the en
 ## `"standard"` decoder
 
 Layout `[1, attrs, N]` with `attrs = 4 + numClasses`. Channel-major:
-
 - `data[0 * N + i]` … `data[3 * N + i]` — cx, cy, w, h for box i
 - `data[4 * N + i]` … `data[(4 + C - 1) * N + i]` — class scores for box i
 
 Decoder steps:
-
 1. **Sigmoid sampling** — read up to 10 class-score samples from `data[4 * N + i]`. If any falls outside `[0, 1]`, set `needsSigmoid = true`.
 2. For each box `i`: walk classes, pick argmax. If `needsSigmoid`, run `1 / (1 + exp(-x))` on each score.
 3. Reject if argmax score < `confThreshold` or argmax class not in `classFilter`.
@@ -53,14 +50,14 @@ Layout `[1, N, attrs]`. Same as `"standard"` after transposing `data` from `[N, 
 
 `dispatchAuto` inspects `output.dims` and routes:
 
-| Dims                                                | Picked format                  |
-| --------------------------------------------------- | ------------------------------ |
-| `[1, N, 6]` (`dims[2] === 6`)                       | `"end-to-end"`                 |
-| `[1, 6, N]` (`dims[1] === 6`)                       | `"end-to-end-transposed"`      |
-| `[1, dim1, dim2]` with `dim1 < dim2`                | `"standard"` (attrs < N)       |
-| `[1, dim1, dim2]` with `dim1 > dim2`                | `"standard-transposed"` (N > attrs) |
-| `[N, 6]` (2D variant)                               | `"end-to-end"`                 |
-| anything else                                       | `console.warn`, return `[]`    |
+| Dims                                 | Picked format                       |
+| ------------------------------------ | ----------------------------------- |
+| `[1, N, 6]` (`dims[2] === 6`)        | `"end-to-end"`                      |
+| `[1, 6, N]` (`dims[1] === 6`)        | `"end-to-end-transposed"`           |
+| `[1, dim1, dim2]` with `dim1 < dim2` | `"standard"` (attrs < N)            |
+| `[1, dim1, dim2]` with `dim1 > dim2` | `"standard-transposed"` (N > attrs) |
+| `[N, 6]` (2D variant)                | `"end-to-end"`                      |
+| anything else                        | `console.warn`, return `[]`         |
 
 `dispatchAuto` calls `console.log` exactly **once per page lifetime** to announce its choice (see `autoFormatLogged` module flag). The log is informational, not a warning — read it during development and pin the format for production.
 

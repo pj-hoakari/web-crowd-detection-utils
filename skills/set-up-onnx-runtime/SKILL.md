@@ -1,30 +1,32 @@
 ---
+
 name: set-up-onnx-runtime
 description: >
-  Use the onnx subpath (initSession, createPreprocessor / createPreprocessBuffer
-  / rgbaToFloat32Chw, isWebGpuAvailable) directly for non-YOLO ONNX models or
-  custom inference pipelines. Load when an agent runs a segmentation/pose/depth
-  model, wires SSR-safe inference into Next.js, picks WebGPU vs WASM, self-hosts
-  the ONNX Runtime WASM assets (wcdu-copy-runtime-assets CLI + the wasmPaths
-  option) for bundlers that don't serve them (Next.js standalone / Turbopack),
-  debugs buffer ownership, or is tempted to import onnxruntime-web directly.
-  Covers the lib-owns-onnxruntime-web contract (never bypass), Preprocessor
-  buffer overwrite semantics, InitSessionOptions and the omitted
-  executionProviders field, the wasmPaths runtime-asset location override (a
-  process-global singleton), Worker compatibility (every subpath runs in a Web
-  Worker — the source capturers use OffscreenCanvas — so only consumer-side
-  captureStream() needs the main thread), and dynamic-import SSR safety.
+Use the onnx subpath (initSession, createPreprocessor / createPreprocessBuffer
+/ rgbaToFloat32Chw, isWebGpuAvailable) directly for non-YOLO ONNX models or
+custom inference pipelines. Load when an agent runs a segmentation/pose/depth
+model, wires SSR-safe inference into Next.js, picks WebGPU vs WASM, self-hosts
+the ONNX Runtime WASM assets (wcdu-copy-runtime-assets CLI + the wasmPaths
+option) for bundlers that don't serve them (Next.js standalone / Turbopack),
+debugs buffer ownership, or is tempted to import onnxruntime-web directly.
+Covers the lib-owns-onnxruntime-web contract (never bypass), Preprocessor
+buffer overwrite semantics, InitSessionOptions and the omitted
+executionProviders field, the wasmPaths runtime-asset location override (a
+process-global singleton), Worker compatibility (every subpath runs in a Web
+Worker — the source capturers use OffscreenCanvas — so only consumer-side
+captureStream() needs the main thread), and dynamic-import SSR safety.
 metadata:
-  type: core
-  library: web-crowd-detection-utils
-  library_version: "0.0.0"
+type: core
+library: web-crowd-detection-utils
+library_version: "0.0.0"
 sources:
-  - "pj-hoakari/web-crowd-detection-utils:src/onnx/session.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/onnx/preprocess.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/onnx/backend.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/onnx/types.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/bin/copy-runtime-assets.ts"
-  - "pj-hoakari/web-crowd-detection-utils:CLAUDE.md"
+- "pj-hoakari/web-crowd-detection-utils:src/onnx/session.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/onnx/preprocess.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/onnx/backend.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/onnx/types.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/bin/copy-runtime-assets.ts"
+- "pj-hoakari/web-crowd-detection-utils:CLAUDE.md"
+
 ---
 
 # Set up onnxruntime-web for a custom (non-YOLO) model
@@ -35,28 +37,28 @@ The `onnx` subpath is the library's interface to `onnxruntime-web`. It is the on
 
 ```ts
 import {
-  initSession,
-  isWebGpuAvailable,
-  createPreprocessor,
-  rgbaToFloat32Chw,
-  createPreprocessBuffer,
-  type InitSessionOptions,
-  type SessionResult,
-  type ExecutionProvider,
+	initSession,
+	isWebGpuAvailable,
+	createPreprocessor,
+	rgbaToFloat32Chw,
+	createPreprocessBuffer,
+	type InitSessionOptions,
+	type SessionResult,
+	type ExecutionProvider,
 } from "@pj-hoakari/web-crowd-detection-utils/onnx";
 
 const INPUT_SIZE = 640;
 
 async function loadModel(
-  modelPath: string | ArrayBufferLike | Uint8Array,
+	modelPath: string | ArrayBufferLike | Uint8Array,
 ): Promise<SessionResult> {
-  const preferred: ExecutionProvider = isWebGpuAvailable() ? "webgpu" : "wasm";
-  try {
-    return await initSession(modelPath, { executionProvider: preferred });
-  } catch (err) {
-    if (preferred !== "webgpu") throw err;
-    return initSession(modelPath, { executionProvider: "wasm" });
-  }
+	const preferred: ExecutionProvider = isWebGpuAvailable() ? "webgpu" : "wasm";
+	try {
+		return await initSession(modelPath, { executionProvider: preferred });
+	} catch (err) {
+		if (preferred !== "webgpu") throw err;
+		return initSession(modelPath, { executionProvider: "wasm" });
+	}
 }
 ```
 
@@ -68,18 +70,25 @@ async function loadModel(
 import type * as ort from "onnxruntime-web";
 const ort = await import("onnxruntime-web/webgpu"); // ok inside an async fn / event handler
 
-const { session } = await initSession(modelPath, { executionProvider: "webgpu" });
+const { session } = await initSession(modelPath, {
+	executionProvider: "webgpu",
+});
 const preprocessor = createPreprocessor(INPUT_SIZE);
 const inputName = session.inputNames[0];
 if (!inputName) throw new Error("session has no input");
 
 while (!signal.aborted) {
-  const imageData = capturer.capture(video);   // ImageData of inputSize × inputSize
-  const float32 = preprocessor.process(imageData); // SAME buffer every call — overwritten
-  const tensor = new ort.Tensor("float32", float32, [1, 3, INPUT_SIZE, INPUT_SIZE]);
-  const results = await session.run({ [inputName]: tensor });
-  // custom postprocess for your model output
-  await new Promise<void>((r) => requestAnimationFrame(() => r()));
+	const imageData = capturer.capture(video); // ImageData of inputSize × inputSize
+	const float32 = preprocessor.process(imageData); // SAME buffer every call — overwritten
+	const tensor = new ort.Tensor("float32", float32, [
+		1,
+		3,
+		INPUT_SIZE,
+		INPUT_SIZE,
+	]);
+	const results = await session.run({ [inputName]: tensor });
+	// custom postprocess for your model output
+	await new Promise<void>((r) => requestAnimationFrame(() => r()));
 }
 ```
 
@@ -89,10 +98,10 @@ while (!signal.aborted) {
 const buffer = createPreprocessBuffer(640);
 
 const detector = await createYoloDetector({
-  modelPath,
-  executionProvider: "webgpu",
-  inputSize: 640,
-  preprocessBuffer: buffer,      // detector reuses this
+	modelPath,
+	executionProvider: "webgpu",
+	inputSize: 640,
+	preprocessBuffer: buffer, // detector reuses this
 });
 
 // In the same loop body — write into the same buffer for a custom branch
@@ -108,9 +117,9 @@ const float32 = rgbaToFloat32Chw(imageData, { inputSize: 640, buffer });
 import { initSession } from "@pj-hoakari/web-crowd-detection-utils/onnx";
 
 export async function loadDetector(modelPath: ArrayBuffer) {
-  // First call dynamically imports onnxruntime-web; pays bundle fetch + WASM
-  // init (hundreds of ms to several seconds). Subsequent calls are fast.
-  return initSession(modelPath, { executionProvider: "webgpu" });
+	// First call dynamically imports onnxruntime-web; pays bundle fetch + WASM
+	// init (hundreds of ms to several seconds). Subsequent calls are fast.
+	return initSession(modelPath, { executionProvider: "webgpu" });
 }
 
 // In a React component: call from useEffect / onClick, never during SSR render.
@@ -130,25 +139,25 @@ npx wcdu-copy-runtime-assets public/onnxruntime
 ```jsonc
 // package.json — keep the copy in sync on install and build
 {
-  "scripts": {
-    "postinstall": "wcdu-copy-runtime-assets public/onnxruntime",
-    "prebuild": "wcdu-copy-runtime-assets public/onnxruntime"
-  }
+	"scripts": {
+		"postinstall": "wcdu-copy-runtime-assets public/onnxruntime",
+		"prebuild": "wcdu-copy-runtime-assets public/onnxruntime"
+	}
 }
 ```
 
 ```ts
 // 2. Point the runtime at the served path via wasmPaths.
 const { session } = await initSession(modelPath, {
-  executionProvider: "webgpu",
-  wasmPaths: "/onnxruntime/", // matches the copy destination (public/onnxruntime → /onnxruntime/)
+	executionProvider: "webgpu",
+	wasmPaths: "/onnxruntime/", // matches the copy destination (public/onnxruntime → /onnxruntime/)
 });
 
 // Through the YOLO detector the same option lives under `session`:
 const detector = await createYoloDetector({
-  modelPath,
-  executionProvider: "webgpu",
-  session: { wasmPaths: "/onnxruntime/" },
+	modelPath,
+	executionProvider: "webgpu",
+	session: { wasmPaths: "/onnxruntime/" },
 });
 ```
 
@@ -156,14 +165,14 @@ const detector = await createYoloDetector({
 
 ### Worker compatibility — every subpath runs in a Web Worker
 
-| Subpath / API                                       | DOM-free | Worker-safe |
-| --------------------------------------------------- | -------- | ----------- |
-| `onnx/preprocess` (`createPreprocessor`, etc.)      | Yes      | Yes         |
-| `onnx/session` (`initSession`)                      | Yes      | Yes — pass `wasmPaths` so ORT resolves its WASM assets from a path the worker can fetch |
-| `bytetrack` (`BYTETracker`)                         | Yes      | Yes         |
-| `yolo/postprocess` (`postprocess`, `nms`)           | Yes      | Yes         |
-| `source` (`create*Capturer`)                        | Yes — prefers `OffscreenCanvas`, falls back to `document.createElement` | Yes (when the `OffscreenCanvas` constructor exists — covers all workers) |
-| `source/letterbox.ts:computeLetterboxParams`        | Yes      | Yes (pure function) |
+| Subpath / API                                  | DOM-free                                                                | Worker-safe                                                                             |
+| ---------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `onnx/preprocess` (`createPreprocessor`, etc.) | Yes                                                                     | Yes                                                                                     |
+| `onnx/session` (`initSession`)                 | Yes                                                                     | Yes — pass `wasmPaths` so ORT resolves its WASM assets from a path the worker can fetch |
+| `bytetrack` (`BYTETracker`)                    | Yes                                                                     | Yes                                                                                     |
+| `yolo/postprocess` (`postprocess`, `nms`)      | Yes                                                                     | Yes                                                                                     |
+| `source` (`create*Capturer`)                   | Yes — prefers `OffscreenCanvas`, falls back to `document.createElement` | Yes (when the `OffscreenCanvas` constructor exists — covers all workers)                |
+| `source/letterbox.ts:computeLetterboxParams`   | Yes                                                                     | Yes (pure function)                                                                     |
 
 Since the OffscreenCanvas change, no subpath is main-thread-only. The capturers call `createScratchCanvas2D`, which allocates `new OffscreenCanvas(...)` whenever the constructor exists, so you can run the entire pipeline — capture included — inside a Worker. (You can still capture on the main thread and transfer `ImageData` plus `LetterboxParams` to a Worker that runs `initSession` + `detector.detect` + `tracker.update` if you prefer.) The one main-thread-only operation is consumer-side: `captureStream()` exists only on `HTMLCanvasElement`, so narrow `capturer.canvas` with `instanceof` before calling it — see `handle-frame-coordinates`.
 
@@ -177,7 +186,7 @@ Wrong:
 // Copying the onnxruntime-web README — skips every safeguard this lib centralizes
 import * as ort from "onnxruntime-web/webgpu";
 const session = await ort.InferenceSession.create(modelPath, {
-  executionProviders: ["webgpu"],
+	executionProviders: ["webgpu"],
 });
 const tensor = new ort.Tensor("float32", float32, [1, 3, 640, 640]);
 ```
@@ -187,7 +196,9 @@ Correct:
 ```ts
 // initSession is THE entry point. Improvements land here for every consumer.
 import { initSession } from "@pj-hoakari/web-crowd-detection-utils/onnx";
-const { session } = await initSession(modelPath, { executionProvider: "webgpu" });
+const { session } = await initSession(modelPath, {
+	executionProvider: "webgpu",
+});
 // For custom models, run session.run yourself; for YOLO use createYoloDetector.
 ```
 
@@ -202,10 +213,10 @@ Wrong:
 ```jsonc
 // consumer-app/package.json
 {
-  "dependencies": {
-    "@pj-hoakari/web-crowd-detection-utils": "^0.1.0",
-    "onnxruntime-web": "^1.24.0"   // do not add — owned by the library
-  }
+	"dependencies": {
+		"@pj-hoakari/web-crowd-detection-utils": "^0.1.0",
+		"onnxruntime-web": "^1.24.0" // do not add — owned by the library
+	}
 }
 ```
 
@@ -213,9 +224,9 @@ Correct:
 
 ```jsonc
 {
-  "dependencies": {
-    "@pj-hoakari/web-crowd-detection-utils": "^0.1.0"
-  }
+	"dependencies": {
+		"@pj-hoakari/web-crowd-detection-utils": "^0.1.0"
+	}
 }
 ```
 
@@ -231,7 +242,7 @@ Wrong:
 // detection.ts — top-level static import defeats SSR safety
 import * as ort from "onnxruntime-web/webgpu";
 export async function load() {
-  return initSession(path, { executionProvider: "webgpu" });
+	return initSession(path, { executionProvider: "webgpu" });
 }
 ```
 
@@ -241,7 +252,7 @@ Correct:
 // Let initSession do the dynamic import internally on first call
 import { initSession } from "@pj-hoakari/web-crowd-detection-utils/onnx";
 export async function load() {
-  return initSession(path, { executionProvider: "webgpu" });
+	return initSession(path, { executionProvider: "webgpu" });
 }
 ```
 
@@ -292,10 +303,12 @@ Correct:
 
 ```ts
 // Either copy per frame:
-for (const frame of frames) batch.push(new Float32Array(preprocessor.process(frame)));
+for (const frame of frames)
+	batch.push(new Float32Array(preprocessor.process(frame)));
 
 // Or use the per-call allocation form:
-for (const frame of frames) batch.push(rgbaToFloat32Chw(frame, { inputSize: 640 }));
+for (const frame of frames)
+	batch.push(rgbaToFloat32Chw(frame, { inputSize: 640 }));
 ```
 
 `Preprocessor.process` and `rgbaToFloat32Chw(..., { buffer })` both return the same `Float32Array` instance every call. Storing the reference and reading later sees the latest frame.
@@ -309,8 +322,8 @@ Wrong:
 ```ts
 // TypeScript blocks executionProviders inside sessionOptions; agent reaches for `as any`
 await initSession(path, {
-  executionProvider: "webgpu",
-  sessionOptions: { executionProviders: ["wasm"] as any },
+	executionProvider: "webgpu",
+	sessionOptions: { executionProviders: ["wasm"] as any },
 });
 ```
 
@@ -333,7 +346,9 @@ Wrong:
 // No wasmPaths — ORT resolves ort-wasm-*.wasm relative to its own module URL.
 // Under Next.js `output: "standalone"` or Turbopack the file is never emitted
 // from node_modules, so the first inference fails fetching the .wasm.
-const { session } = await initSession(modelPath, { executionProvider: "webgpu" });
+const { session } = await initSession(modelPath, {
+	executionProvider: "webgpu",
+});
 ```
 
 Correct:
@@ -341,8 +356,8 @@ Correct:
 ```ts
 // Self-host the assets (see § Self-host the ONNX Runtime WASM assets) and point at them.
 const { session } = await initSession(modelPath, {
-  executionProvider: "webgpu",
-  wasmPaths: "/onnxruntime/",
+	executionProvider: "webgpu",
+	wasmPaths: "/onnxruntime/",
 });
 ```
 
@@ -359,8 +374,8 @@ Wrong:
 // pinned to the wrong version. The JS glue this package bundles expects the exact
 // matching build — a mismatch makes ONNX Runtime fail to initialize.
 initSession(modelPath, {
-  executionProvider: "wasm",
-  wasmPaths: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.0/dist/",
+	executionProvider: "wasm",
+	wasmPaths: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.0/dist/",
 });
 ```
 
@@ -373,7 +388,10 @@ npx wcdu-copy-runtime-assets public/onnxruntime
 ```
 
 ```ts
-initSession(modelPath, { executionProvider: "wasm", wasmPaths: "/onnxruntime/" });
+initSession(modelPath, {
+	executionProvider: "wasm",
+	wasmPaths: "/onnxruntime/",
+});
 ```
 
 `wcdu-copy-runtime-assets` copies `ort-wasm-simd-threaded.asyncify.{wasm,mjs}` resolved from the installed `onnxruntime-web` (which this package owns), guaranteeing the runtime matches the glue. A hand-picked file or wrong-version CDN URL throws at session create with a runtime-init error.
@@ -389,8 +407,8 @@ Wrong:
 const a = await initSession(modelA, { executionProvider: "webgpu" });
 // Second session sets wasmPaths, expecting to "fix" the path globally.
 const b = await initSession(modelB, {
-  executionProvider: "webgpu",
-  wasmPaths: "/onnxruntime/", // too late — assets already resolved for the page
+	executionProvider: "webgpu",
+	wasmPaths: "/onnxruntime/", // too late — assets already resolved for the page
 });
 ```
 
@@ -399,8 +417,8 @@ Correct:
 ```ts
 // Set wasmPaths on (or before) the FIRST session created on the page.
 const a = await initSession(modelA, {
-  executionProvider: "webgpu",
-  wasmPaths: "/onnxruntime/",
+	executionProvider: "webgpu",
+	wasmPaths: "/onnxruntime/",
 });
 const b = await initSession(modelB, { executionProvider: "webgpu" }); // inherits the global
 ```

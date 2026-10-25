@@ -9,7 +9,6 @@ This document is **tool-neutral** — Claude Code, GitHub Copilot, and human con
 This package is **published to npm** and consumed by applications we do not control. A TSDoc comment is not a code comment — it is the contract that appears in the consumer's IDE hover tooltip, in their AI assistant's context, and in any generated reference site. Once shipped, the documented behavior is part of the API; changing it without a version bump breaks consumers silently.
 
 The bar is therefore higher than for internal code:
-
 - **Document contracts the type system cannot express** (preconditions, side effects, ownership, exception conditions).
 - **Document the relationship to neighboring modules** when correct use depends on it (e.g., capturer ↔ reverse-transform pairing).
 - **Never let the doc drift from the implementation**. If a function throws, `@throws` must say so. If a default changes, the doc changes too.
@@ -58,20 +57,20 @@ The first line of every TSDoc block is a short summary. IDE hover shows this fir
 
 Always specify the `ts` language identifier so syntax highlighting works in IDE hover and generated docs.
 
-```ts
+````ts
 /**
  * @example
  * ```ts
  * const buffer = createPreprocessBuffer(640);
  * ```
  */
-```
+````
 
 ### Multiple examples
 
 Use a separate `@example` tag per example. Never combine into a single block.
 
-```ts
+````ts
 /**
  * @example
  * Per-call allocation:
@@ -86,14 +85,13 @@ Use a separate `@example` tag per example. Never combine into a single block.
  * for (const frame of frames) rgbaToFloat32Chw(frame, { buffer });
  * ```
  */
-```
+````
 
 ## Content rules
 
 ### 1. Document the contract, not the code
 
-Well-named identifiers already say *what* the code does. TSDoc must say what the type system cannot:
-
+Well-named identifiers already say _what_ the code does. TSDoc must say what the type system cannot:
 - **Preconditions** — "`imageData.width` and `imageData.height` must equal `inputSize`."
 - **Side effects** — "Mutates internal track lists." / "Returned buffer is overwritten by the next call."
 - **Ownership** — "Caller-owned buffer; the function writes into and returns the same instance."
@@ -130,7 +128,6 @@ Vague terms hide bugs. "Normalized RGB data" could mean `[0, 1]` scaling, ImageN
 ### 5. Document integration points
 
 When correct use of an API depends on another module, say so:
-
 - `Detection` (yolo) → `Observation` (bytetrack): "Structurally compatible; can be passed without remapping."
 - `createLetterboxCapturer` ↔ `reverseLetterboxBox`: "Pair this with...; for stretched captures, use `reverseStretchBox` instead — the two transforms are not interchangeable."
 - `createYoloDetector` returns detections in **model input space**; document the requirement to apply `reverseLetterboxBox` / `reverseStretchBox` from the `source` subpath.
@@ -140,7 +137,6 @@ Use `{@link OtherName}` for cross-references so IDE navigation works.
 ### 6. `@remarks` for non-obvious behavior
 
 Use `@remarks` for things a reader would not infer from the signature:
-
 - Initial-load cost ("first call pays bundle fetch + WASM init, possibly seconds")
 - Auto-detection heuristics (sigmoid detection in `postprocessStandard`)
 - Statefulness and reset semantics
@@ -197,18 +193,18 @@ Module-local helpers that need a TSDoc block (typically to explain a non-obvious
 
 These were real defects found during the TSDoc audit. Don't reintroduce them.
 
-| Anti-pattern | Example | Fix |
-|---|---|---|
-| Missing summary | `/** @returns true if ... */` | Add a single-sentence summary as the first line. |
-| Missing `@throws` | Function throws on bad input but doc omits it | Add one `@throws` per distinct condition. |
-| Doc-implementation drift | Doc says "path to file" but param accepts `ArrayBuffer` too | Match the actual type union. |
-| Vague terms | "normalized RGB data" | Specify the operation: "scaled to `[0, 1]` by dividing by 255". |
-| `Note:` instead of `@remarks` | `* Note: This function does not...` | Use `@remarks`. |
-| Combined `@example` | Two unrelated snippets in one block | Split into separate `@example` tags. |
-| Undocumented module state | Returns cached buffer without saying so | Document the caching behavior and its lifetime / aliasing implications. |
-| Restating the type | `@param x - A number` | Say what `x` represents semantically. |
-| Restating the name | `/** Creates a preprocess buffer. */ createPreprocessBuffer` | The summary should add information the name does not. |
-| Missing cross-module pairing | `reverseLetterboxBox` without mentioning `createLetterboxCapturer` | Add `{@link}` and explain the pairing constraint. |
+| Anti-pattern                  | Example                                                            | Fix                                                                     |
+| ----------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| Missing summary               | `/** @returns true if ... */`                                      | Add a single-sentence summary as the first line.                        |
+| Missing `@throws`             | Function throws on bad input but doc omits it                      | Add one `@throws` per distinct condition.                               |
+| Doc-implementation drift      | Doc says "path to file" but param accepts `ArrayBuffer` too        | Match the actual type union.                                            |
+| Vague terms                   | "normalized RGB data"                                              | Specify the operation: "scaled to `[0, 1]` by dividing by 255".         |
+| `Note:` instead of `@remarks` | `* Note: This function does not...`                                | Use `@remarks`.                                                         |
+| Combined `@example`           | Two unrelated snippets in one block                                | Split into separate `@example` tags.                                    |
+| Undocumented module state     | Returns cached buffer without saying so                            | Document the caching behavior and its lifetime / aliasing implications. |
+| Restating the type            | `@param x - A number`                                              | Say what `x` represents semantically.                                   |
+| Restating the name            | `/** Creates a preprocess buffer. */ createPreprocessBuffer`       | The summary should add information the name does not.                   |
+| Missing cross-module pairing  | `reverseLetterboxBox` without mentioning `createLetterboxCapturer` | Add `{@link}` and explain the pairing constraint.                       |
 
 ## Library-specific reminders
 
@@ -219,7 +215,6 @@ These were real defects found during the TSDoc audit. Don't reintroduce them.
 ## Checklist before committing
 
 For every public function, class, interface, or type added or modified:
-
 - [ ] Summary line present, single sentence, written first.
 - [ ] `@param` for every parameter, describing semantics not type.
 - [ ] `@returns` present (omit only for `void`).

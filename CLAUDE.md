@@ -13,7 +13,6 @@ This package extracts the `src/lib/` modules of `web-crowd-detection-sandbox` in
 ## Modules (extracted from sandbox `src/lib/`)
 
 Each is an independent subpath export (e.g. `web-crowd-detection-utils/yolo`):
-
 - `bytetrack` — ByteTrack multi-object tracker (STrack, Kalman, Hungarian, 3-stage association). Detector-agnostic; consumes `Observation = {x1,y1,x2,y2,score}`.
 - `yolo` — YOLO-specific postprocess (3-format auto-dispatch: end-to-end `[N,6]` / transposed / standard `[attrs,N]`), NMS, person-class filter. Entry point in sandbox: `detectPersons(session, imageData, confThreshold)`.
 - `onnx` — Model-agnostic ONNX Runtime Web wrapper: session creation, backend selection (WebGPU primary / WASM fallback), RGBA→CHW preprocess.
@@ -37,13 +36,14 @@ A PostToolUse hook in `.claude/settings.json` runs `biome check --fix` automatic
 ## Adding a new module (workflow)
 
 When porting a module from sandbox `src/lib/<name>/` (e.g. `yolo`):
-
 1. Create `src/<name>/` with the ported sources and a barrel `src/<name>/index.ts`.
 2. Add the entry to `tsdown.config.ts`:
+
    ```ts
    entry: ["src/index.ts", "src/<name>/index.ts"],
    ```
 3. Add the subpath export to `package.json#exports`:
+
    ```json
    "./<name>": {
      "types": "./dist/<name>/index.d.ts",

@@ -1,27 +1,29 @@
 ---
+
 name: suppress-static-detections
 description: >
-  Add the detector-agnostic BackgroundSubtractor (EMA background model + 3×3
-  morphological open) to a working detection loop to attenuate the confidence of
-  static detections and cut false positives on posters / mannequins / parked
-  scenery. Load when an agent adds background subtraction, calls suppressStatic /
-  foregroundRatio / update / reset, tunes alpha / diffThreshold /
-  minForegroundRatio, or is tempted to hand-roll frame differencing. Covers the
-  update() warm-up + ready boolean, suppressStatic (score attenuation, NOT
-  removal — exclude downstream), the background-model pixel-space requirement
-  (apply BEFORE the reverse transform; subtractor width×height must match the box
-  space), Box / ScoredBox compatibility with Detection / Observation / TrackedBox,
-  and reset() on source switch.
+Add the detector-agnostic BackgroundSubtractor (EMA background model + 3×3
+morphological open) to a working detection loop to attenuate the confidence of
+static detections and cut false positives on posters / mannequins / parked
+scenery. Load when an agent adds background subtraction, calls suppressStatic /
+foregroundRatio / update / reset, tunes alpha / diffThreshold /
+minForegroundRatio, or is tempted to hand-roll frame differencing. Covers the
+update() warm-up + ready boolean, suppressStatic (score attenuation, NOT
+removal — exclude downstream), the background-model pixel-space requirement
+(apply BEFORE the reverse transform; subtractor width×height must match the box
+space), Box / ScoredBox compatibility with Detection / Observation / TrackedBox,
+and reset() on source switch.
 metadata:
-  type: core
-  library: web-crowd-detection-utils
-  library_version: "0.0.0"
+type: core
+library: web-crowd-detection-utils
+library_version: "0.0.0"
 sources:
-  - "pj-hoakari/web-crowd-detection-utils:src/background/subtractor.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/background/types.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/background/constants.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/background/index.ts"
-  - "pj-hoakari/web-crowd-detection-utils:CLAUDE.md"
+- "pj-hoakari/web-crowd-detection-utils:src/background/subtractor.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/background/types.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/background/constants.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/background/index.ts"
+- "pj-hoakari/web-crowd-detection-utils:CLAUDE.md"
+
 ---
 
 # Suppress static false positives with the background model
@@ -38,18 +40,18 @@ const bg = new BackgroundSubtractor({ width: INPUT_SIZE, height: INPUT_SIZE });
 const CONF_CUTOFF = 0.3;
 
 while (!signal.aborted) {
-  const { imageData, params } = capturer.capture(video); // INPUT_SIZE × INPUT_SIZE
-  let dets = await detector.detect(imageData);            // model-input space (0..640)
+	const { imageData, params } = capturer.capture(video); // INPUT_SIZE × INPUT_SIZE
+	let dets = await detector.detect(imageData); // model-input space (0..640)
 
-  const ready = bg.update(imageData);                     // SAME frame fed to the detector
-  if (ready) {
-    dets = bg.suppressStatic(dets, 0.3);                  // model space — spaces match
-    dets = dets.filter((d) => d.score >= CONF_CUTOFF);    // suppressStatic only lowers score
-  }
+	const ready = bg.update(imageData); // SAME frame fed to the detector
+	if (ready) {
+		dets = bg.suppressStatic(dets, 0.3); // model space — spaces match
+		dets = dets.filter((d) => d.score >= CONF_CUTOFF); // suppressStatic only lowers score
+	}
 
-  const inSource = reverseLetterboxBoxes(dets, params);   // reverse AFTER suppression
-  const tracked = tracker.update(inSource);
-  await new Promise<void>((r) => requestAnimationFrame(() => r()));
+	const inSource = reverseLetterboxBoxes(dets, params); // reverse AFTER suppression
+	const tracked = tracker.update(inSource);
+	await new Promise<void>((r) => requestAnimationFrame(() => r()));
 }
 ```
 
@@ -77,11 +79,11 @@ The same call accepts a `bytetrack` `Observation` / `TrackedBox` or any custom `
 // background. For crowds where people stand still, adapt SLOWER so real people
 // stay foreground longer:
 const bg = new BackgroundSubtractor({
-  width: 640,
-  height: 640,
-  alpha: 0.005,             // slower background adaptation
-  diffThreshold: 20,        // luma units 0..255; raise to ignore more sensor noise
-  minForegroundRatio: 0.05, // foreground fraction of a box required to count as "active"
+	width: 640,
+	height: 640,
+	alpha: 0.005, // slower background adaptation
+	diffThreshold: 20, // luma units 0..255; raise to ignore more sensor noise
+	minForegroundRatio: 0.05, // foreground fraction of a box required to count as "active"
 });
 
 // The tuning fields are mutable at runtime:
@@ -92,8 +94,8 @@ bg.alpha = 0.002;
 
 ```ts
 function switchSource(video: HTMLVideoElement, nextUrl: string): void {
-  video.src = nextUrl;
-  bg.reset(); // discard the old scene; the next update() re-seeds (returns false once)
+	video.src = nextUrl;
+	bg.reset(); // discard the old scene; the next update() re-seeds (returns false once)
 }
 ```
 
@@ -104,7 +106,7 @@ function switchSource(video: HTMLVideoElement, nextUrl: string): void {
 // model space. Use it for a custom decision instead of suppressStatic's scaling.
 const ratio = bg.foregroundRatio(box);
 if (ratio < bg.minForegroundRatio) {
-  // box sits in a static region — drop it, dim it, or skip an expensive crop
+	// box sits in a static region — drop it, dim it, or skip an expensive crop
 }
 ```
 
@@ -118,8 +120,8 @@ Wrong:
 // App code re-implements EMA background subtraction by hand
 const bg = new Float32Array(w * h);
 for (const frame of frames) {
-  // manual grayscale + EMA + threshold — no morphological denoise, no warm-up
-  // handling; diverges from the library and silently rots
+	// manual grayscale + EMA + threshold — no morphological denoise, no warm-up
+	// handling; diverges from the library and silently rots
 }
 ```
 
@@ -143,7 +145,7 @@ Wrong:
 
 ```ts
 const { imageData, params } = capturer.capture(video); // 640×640
-let dets = await detector.detect(imageData);            // model space
+let dets = await detector.detect(imageData); // model space
 const sourceSpace = reverseLetterboxBoxes(dets, params); // 1280×720 space
 bg.update(imageData);
 const suppressed = bg.suppressStatic(sourceSpace, 0.3); // source-space boxes vs 640×640 model
@@ -153,9 +155,9 @@ Correct:
 
 ```ts
 const { imageData, params } = capturer.capture(video); // 640×640
-let dets = await detector.detect(imageData);            // model space
-const ready = bg.update(imageData);                     // SAME 640×640 frame
-if (ready) dets = bg.suppressStatic(dets, 0.3);         // spaces match
+let dets = await detector.detect(imageData); // model space
+const ready = bg.update(imageData); // SAME 640×640 frame
+if (ready) dets = bg.suppressStatic(dets, 0.3); // spaces match
 const sourceSpace = reverseLetterboxBoxes(dets, params);
 const tracked = tracker.update(sourceSpace);
 ```
@@ -191,8 +193,8 @@ Source: src/background/subtractor.ts:200-241 (returns copy with scaled score, no
 Wrong:
 
 ```ts
-bg.update(imageData);                 // return value ignored
-dets = bg.suppressStatic(dets, 0.3);  // frame 1: every detection attenuated
+bg.update(imageData); // return value ignored
+dets = bg.suppressStatic(dets, 0.3); // frame 1: every detection attenuated
 ```
 
 Correct:
@@ -233,8 +235,8 @@ Source: src/background/constants.ts:13-30 (alpha / diffThreshold / minForeground
 Wrong:
 
 ```ts
-video.src = nextClipUrl;             // new scene, same subtractor
-const ready = bg.update(imageData);  // stale background, wrong mask for many frames
+video.src = nextClipUrl; // new scene, same subtractor
+const ready = bg.update(imageData); // stale background, wrong mask for many frames
 ```
 
 Correct:

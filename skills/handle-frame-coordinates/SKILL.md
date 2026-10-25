@@ -1,25 +1,27 @@
 ---
+
 name: handle-frame-coordinates
 description: >
-  Choose createLetterboxCapturer (aspect-preserving with padding) vs
-  createCanvasFrameCapturer (stretch), and apply the matching reverse transform
-  (reverseLetterboxBox / reverseLetterboxBoxes for letterbox, reverseStretchBox
-  for stretch). Load when an agent debugs misaligned rendered boxes, source
-  resolution changes mid-stream, capture-before-metadata errors, or needs to
-  pick a capture strategy. Covers computeLetterboxParams, LetterboxParams
-  fields, CaptureSource types (HTMLVideoElement / HTMLImageElement / VideoFrame
-  / OffscreenCanvas), the CaptureCanvas return type (capturers run in Web Workers
-  via OffscreenCanvas — narrow capturer.canvas with instanceof before
-  captureStream()), and per-call params re-evaluation.
+Choose createLetterboxCapturer (aspect-preserving with padding) vs
+createCanvasFrameCapturer (stretch), and apply the matching reverse transform
+(reverseLetterboxBox / reverseLetterboxBoxes for letterbox, reverseStretchBox
+for stretch). Load when an agent debugs misaligned rendered boxes, source
+resolution changes mid-stream, capture-before-metadata errors, or needs to
+pick a capture strategy. Covers computeLetterboxParams, LetterboxParams
+fields, CaptureSource types (HTMLVideoElement / HTMLImageElement / VideoFrame
+/ OffscreenCanvas), the CaptureCanvas return type (capturers run in Web Workers
+via OffscreenCanvas — narrow capturer.canvas with instanceof before
+captureStream()), and per-call params re-evaluation.
 metadata:
-  type: core
-  library: web-crowd-detection-utils
-  library_version: "0.0.0"
+type: core
+library: web-crowd-detection-utils
+library_version: "0.0.0"
 sources:
-  - "pj-hoakari/web-crowd-detection-utils:src/source/letterbox.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/source/capture.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/source/types.ts"
-  - "pj-hoakari/web-crowd-detection-utils:src/source/canvas.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/source/letterbox.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/source/capture.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/source/types.ts"
+- "pj-hoakari/web-crowd-detection-utils:src/source/canvas.ts"
+
 ---
 
 # Round-trip frame coordinates between source and model space
@@ -30,14 +32,14 @@ YOLO detection happens in model input space (`0..inputSize`). The `source` subpa
 
 ```ts
 import {
-  createLetterboxCapturer,
-  reverseLetterboxBox,
-  reverseLetterboxBoxes,
-  createCanvasFrameCapturer,
-  reverseStretchBox,
-  computeLetterboxParams,
-  type Box,
-  type LetterboxParams,
+	createLetterboxCapturer,
+	reverseLetterboxBox,
+	reverseLetterboxBoxes,
+	createCanvasFrameCapturer,
+	reverseStretchBox,
+	computeLetterboxParams,
+	type Box,
+	type LetterboxParams,
 } from "@pj-hoakari/web-crowd-detection-utils/source";
 
 const INPUT_SIZE = 640;
@@ -46,7 +48,10 @@ const INPUT_SIZE = 640;
 const letterbox = createLetterboxCapturer({ inputSize: INPUT_SIZE });
 
 // Stretch: non-aspect-preserving, width × height.
-const stretch = createCanvasFrameCapturer({ width: INPUT_SIZE, height: INPUT_SIZE });
+const stretch = createCanvasFrameCapturer({
+	width: INPUT_SIZE,
+	height: INPUT_SIZE,
+});
 ```
 
 ## Core Patterns
@@ -57,7 +62,7 @@ const stretch = createCanvasFrameCapturer({ width: INPUT_SIZE, height: INPUT_SIZ
 const capturer = createLetterboxCapturer({ inputSize: 640 });
 
 await new Promise<void>((r) =>
-  videoEl.addEventListener("loadedmetadata", () => r(), { once: true }),
+	videoEl.addEventListener("loadedmetadata", () => r(), { once: true }),
 );
 
 const { imageData, params } = capturer.capture(videoEl);
@@ -75,7 +80,7 @@ const capturer = createCanvasFrameCapturer({ width: 640, height: 640 });
 const imageData = capturer.capture(videoEl);
 const dets = await detector.detect(imageData);
 const inSourceSpace = dets.map((d) =>
-  reverseStretchBox(d, videoEl.videoWidth, videoEl.videoHeight, 640),
+	reverseStretchBox(d, videoEl.videoWidth, videoEl.videoHeight, 640),
 );
 ```
 
@@ -116,7 +121,7 @@ const { imageData } = capturer.capture(video);
 const dets = await detector.detect(imageData);
 // Wrong: stretch reverse on a letterbox capture
 const inSource = dets.map((d) =>
-  reverseStretchBox(d, video.videoWidth, video.videoHeight, 640),
+	reverseStretchBox(d, video.videoWidth, video.videoHeight, 640),
 );
 ```
 
@@ -213,10 +218,10 @@ Correct:
 ```ts
 const { canvas } = capturer;
 if (canvas instanceof HTMLCanvasElement) {
-  const stream = canvas.captureStream();
-  // ...
+	const stream = canvas.captureStream();
+	// ...
 } else {
-  // OffscreenCanvas (worker / any thread with the constructor): captureStream() is unavailable here
+	// OffscreenCanvas (worker / any thread with the constructor): captureStream() is unavailable here
 }
 ```
 

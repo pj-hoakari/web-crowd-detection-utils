@@ -4,13 +4,13 @@ Browser-targeted TypeScript building blocks for in-browser YOLO + ByteTrack crow
 
 ## Subpaths
 
-| Import                                              | Purpose                                                                  |
-| --------------------------------------------------- | ------------------------------------------------------------------------ |
-| `@pj-hoakari/web-crowd-detection-utils/yolo`     | High-level `createYoloDetector`, low-level `postprocess` / `nms`         |
-| `@pj-hoakari/web-crowd-detection-utils/onnx`     | `onnxruntime-web` wrapper: `initSession`, `createPreprocessor`           |
-| `@pj-hoakari/web-crowd-detection-utils/source`   | Letterbox / stretch capture and reverse-transform helpers                |
-| `@pj-hoakari/web-crowd-detection-utils/bytetrack` | Detector-agnostic `BYTETracker` multi-object tracker                    |
-| `@pj-hoakari/web-crowd-detection-utils/background` | Detector-agnostic `BackgroundSubtractor` for static-detection suppression |
+| Import                                                | Purpose                                                                                     |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `@pj-hoakari/web-crowd-detection-utils/yolo`          | High-level `createYoloDetector`, low-level `postprocess` / `nms`                            |
+| `@pj-hoakari/web-crowd-detection-utils/onnx`          | `onnxruntime-web` wrapper: `initSession`, `createPreprocessor`                              |
+| `@pj-hoakari/web-crowd-detection-utils/source`        | Letterbox / stretch capture and reverse-transform helpers                                   |
+| `@pj-hoakari/web-crowd-detection-utils/bytetrack`     | Detector-agnostic `BYTETracker` multi-object tracker                                        |
+| `@pj-hoakari/web-crowd-detection-utils/background`    | Detector-agnostic `BackgroundSubtractor` for static-detection suppression                   |
 | `@pj-hoakari/web-crowd-detection-utils/line-crossing` | Detector-agnostic `LineCrossingCounter`: count tracked points crossing anchor-defined lines |
 
 ## Serving the ONNX Runtime WebAssembly assets
@@ -18,7 +18,6 @@ Browser-targeted TypeScript building blocks for in-browser YOLO + ByteTrack crow
 `onnxruntime-web` loads a WebAssembly runtime (`ort-wasm-simd-threaded.asyncify.wasm` + `.mjs`) at inference time. The `.wasm` is **not** inlined into JavaScript — the browser fetches it over HTTP — so a host application must serve it. By default ONNX Runtime resolves it relative to its own bundle URL (`import.meta.url`), which is unreliable with some setups (e.g. Next.js `output: "standalone"` or Turbopack, which does not emit/serve the file from `node_modules`).
 
 This package gives you two pieces to self-host the runtime reliably:
-
 1. A `wcdu-copy-runtime-assets` CLI that copies the exact assets this package needs (resolved from the installed `onnxruntime-web`, so versions always match) into a directory you serve:
 
    ```sh
