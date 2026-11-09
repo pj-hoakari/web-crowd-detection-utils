@@ -15,6 +15,7 @@
 | `trackBuffer`            | `30`    | frame count          | Frames a lost track is retained before removal (~1 s at 30 FPS)                    |
 
 **Reading the thresholds:**
+
 - **Score thresholds** (`highThresh`, `newTrackThresh`) — raw `[0, 1]` scores. Higher = stricter.
 - **IoU-distance thresholds** (`matchThresh`, `secondMatchThresh`, `unconfirmedMatchThresh`, `duplicateIouThresh`) — `1 - IoU`. **Lower = stricter** (require tighter overlap to consider a match).
 
@@ -23,6 +24,7 @@ This is the most common confusion source: tightening `matchThresh` means _loweri
 ## The 3-stage cascade
 
 Each `update()` call runs:
+
 1. **Predict** — every existing track advances its Kalman state by one frame.
 2. **Stage 1** — split detections by `highThresh`. The high-conf set is matched against the pool of `tracked ∪ lost` tracks via IoU. Threshold: `matchThresh`. Matched lost tracks re-activate (re-identification across occlusions).
 3. **Stage 2** — low-conf detections are matched against tracked tracks that Stage 1 didn't claim. Threshold: `secondMatchThresh`. This is ByteTrack's distinguishing idea — recovering occluded objects whose score dropped this frame.
@@ -108,6 +110,7 @@ const TrackState = { New: 0, Tracked: 1, Lost: 2, Removed: 3 } as const;
 Public API only surfaces `TrackState` through internal `STrack.state` (not exposed on `TrackedBox`). The exported value is useful for narrowing if you read through `BYTETracker` internals; consumer code rarely needs it.
 
 Transitions:
+
 - `New → Tracked` on first successful association
 - `Tracked → Lost` when no matching observation this frame
 - `Lost → Tracked` on re-association within `trackBuffer`

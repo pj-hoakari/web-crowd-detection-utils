@@ -42,6 +42,7 @@
 | `src/overlay.ts`  | 共有     | 描画ヘルパー（Worker 側で `OffscreenCanvas` に描画。`clientToCanvas` のみメインで使用）                                                                                                  |
 
 ポイント:
+
 - Worker 内には DOM が無いため、`source` の `createLetterboxCapturer` が内部スクラッチに **`OffscreenCanvas` を自動選択**する（パッケージ側の対応による）
 - フレームは「Worker が処理中なら送らない」バックプレッシャ方式でドロップし、キューの肥大化を防ぐ
 - `transferControlToOffscreen()` はキャンバスごとに一度しか呼べないため、Worker 生成とキャンバス委譲は ref ガードで1回に限定（React StrictMode の二重実行対策）

@@ -14,6 +14,7 @@ type: core
 library: web-crowd-detection-utils
 library_version: "0.0.0"
 sources:
+
 - "pj-hoakari/web-crowd-detection-utils:src/yolo/postprocess.ts"
 - "pj-hoakari/web-crowd-detection-utils:src/yolo/nms.ts"
 - "pj-hoakari/web-crowd-detection-utils:src/yolo/types.ts"

@@ -17,6 +17,7 @@ Each row's `data` is a `Float32Array` regardless of layout. Coordinates are in *
 ## `"end-to-end"` decoder
 
 Layout `[1, N, 6]` rows: `[x1, y1, x2, y2, score, classId]`.
+
 - Skips rows where `score <= 0` (zero-filled padding).
 - Skips rows where `score < confThreshold` (default 0.15).
 - Skips rows where `classId` not in `classFilter` (default `[0]`).
@@ -30,10 +31,12 @@ Layout `[1, 6, N]`. The decoder first transposes to `[1, N, 6]` then runs the en
 ## `"standard"` decoder
 
 Layout `[1, attrs, N]` with `attrs = 4 + numClasses`. Channel-major:
+
 - `data[0 * N + i]` … `data[3 * N + i]` — cx, cy, w, h for box i
 - `data[4 * N + i]` … `data[(4 + C - 1) * N + i]` — class scores for box i
 
 Decoder steps:
+
 1. **Sigmoid sampling** — read up to 10 class-score samples from `data[4 * N + i]`. If any falls outside `[0, 1]`, set `needsSigmoid = true`.
 2. For each box `i`: walk classes, pick argmax. If `needsSigmoid`, run `1 / (1 + exp(-x))` on each score.
 3. Reject if argmax score < `confThreshold` or argmax class not in `classFilter`.

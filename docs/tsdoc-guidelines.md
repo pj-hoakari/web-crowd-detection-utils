@@ -9,6 +9,7 @@ This document is **tool-neutral** — Claude Code, GitHub Copilot, and human con
 This package is **published to npm** and consumed by applications we do not control. A TSDoc comment is not a code comment — it is the contract that appears in the consumer's IDE hover tooltip, in their AI assistant's context, and in any generated reference site. Once shipped, the documented behavior is part of the API; changing it without a version bump breaks consumers silently.
 
 The bar is therefore higher than for internal code:
+
 - **Document contracts the type system cannot express** (preconditions, side effects, ownership, exception conditions).
 - **Document the relationship to neighboring modules** when correct use depends on it (e.g., capturer ↔ reverse-transform pairing).
 - **Never let the doc drift from the implementation**. If a function throws, `@throws` must say so. If a default changes, the doc changes too.
@@ -92,6 +93,7 @@ Use a separate `@example` tag per example. Never combine into a single block.
 ### 1. Document the contract, not the code
 
 Well-named identifiers already say _what_ the code does. TSDoc must say what the type system cannot:
+
 - **Preconditions** — "`imageData.width` and `imageData.height` must equal `inputSize`."
 - **Side effects** — "Mutates internal track lists." / "Returned buffer is overwritten by the next call."
 - **Ownership** — "Caller-owned buffer; the function writes into and returns the same instance."
@@ -128,6 +130,7 @@ Vague terms hide bugs. "Normalized RGB data" could mean `[0, 1]` scaling, ImageN
 ### 5. Document integration points
 
 When correct use of an API depends on another module, say so:
+
 - `Detection` (yolo) → `Observation` (bytetrack): "Structurally compatible; can be passed without remapping."
 - `createLetterboxCapturer` ↔ `reverseLetterboxBox`: "Pair this with...; for stretched captures, use `reverseStretchBox` instead — the two transforms are not interchangeable."
 - `createYoloDetector` returns detections in **model input space**; document the requirement to apply `reverseLetterboxBox` / `reverseStretchBox` from the `source` subpath.
@@ -137,6 +140,7 @@ Use `{@link OtherName}` for cross-references so IDE navigation works.
 ### 6. `@remarks` for non-obvious behavior
 
 Use `@remarks` for things a reader would not infer from the signature:
+
 - Initial-load cost ("first call pays bundle fetch + WASM init, possibly seconds")
 - Auto-detection heuristics (sigmoid detection in `postprocessStandard`)
 - Statefulness and reset semantics
@@ -215,6 +219,7 @@ These were real defects found during the TSDoc audit. Don't reintroduce them.
 ## Checklist before committing
 
 For every public function, class, interface, or type added or modified:
+
 - [ ] Summary line present, single sentence, written first.
 - [ ] `@param` for every parameter, describing semantics not type.
 - [ ] `@returns` present (omit only for `void`).

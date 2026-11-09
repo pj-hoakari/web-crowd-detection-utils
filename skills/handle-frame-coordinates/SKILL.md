@@ -17,6 +17,7 @@ type: core
 library: web-crowd-detection-utils
 library_version: "0.0.0"
 sources:
+
 - "pj-hoakari/web-crowd-detection-utils:src/source/letterbox.ts"
 - "pj-hoakari/web-crowd-detection-utils:src/source/capture.ts"
 - "pj-hoakari/web-crowd-detection-utils:src/source/types.ts"
