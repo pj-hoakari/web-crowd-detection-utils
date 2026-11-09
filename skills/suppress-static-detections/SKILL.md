@@ -18,6 +18,7 @@ type: core
 library: web-crowd-detection-utils
 library_version: "0.0.0"
 sources:
+
 - "pj-hoakari/web-crowd-detection-utils:src/background/subtractor.ts"
 - "pj-hoakari/web-crowd-detection-utils:src/background/types.ts"
 - "pj-hoakari/web-crowd-detection-utils:src/background/constants.ts"

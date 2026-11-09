@@ -21,6 +21,7 @@ type: core
 library: web-crowd-detection-utils
 library_version: "0.0.0"
 sources:
+
 - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/counter.ts"
 - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/direction.ts"
 - "pj-hoakari/web-crowd-detection-utils:src/line-crossing/types.ts"
