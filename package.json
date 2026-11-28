@@ -80,7 +80,7 @@
 		"test:coverage": "vitest run --coverage"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.6.8",
+		"@biomejs/biome": "2.6.9",
 		"@tanstack/intent": "0.5.6",
 		"@vitest/coverage-v8": "5.1.1",
 		"happy-dom": "21.0.4",
